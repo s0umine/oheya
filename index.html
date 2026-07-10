@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>おへや v0.7</title>
+<title>おへや v0.8</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -428,6 +428,76 @@
   }
   .diary-empty .book{font-size:36px;display:block;margin-bottom:8px}
   #diaryAskBtn{width:100%;margin-top:4px}
+
+  /* ---------- アルバム帳 ---------- */
+  #albumBody{
+    flex:1;overflow-y:auto;
+    padding:16px 14px calc(env(safe-area-inset-bottom) + 24px);
+    width:100%;max-width:720px;margin:0 auto;
+  }
+  .album-toolbar{display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap}
+  .album-toolbar .btn{padding:8px 12px;font-size:13px}
+  .album-toolbar .spacer{flex:1}
+  .album-grid{
+    display:grid;gap:8px;
+    grid-template-columns:repeat(auto-fill,minmax(104px,1fr));
+  }
+  .album-thumb{
+    position:relative;aspect-ratio:1;padding:0;
+    border-radius:10px;overflow:hidden;cursor:pointer;
+    border:1px solid var(--line);background:var(--surface);
+  }
+  .album-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .album-thumb:hover{border-color:var(--lamp)}
+  .album-thumb:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+  .album-book{display:flex;flex-direction:column;align-items:center;gap:12px}
+  .album-page{
+    background:var(--paper);color:var(--ink);
+    border-radius:6px 16px 16px 6px;
+    border-left:6px solid var(--lamp);
+    box-shadow:0 6px 18px rgba(0,0,0,.35);
+    padding:16px 16px 14px;width:100%;max-width:480px;
+    transform-origin:left center;
+  }
+  @keyframes pageTurnL{from{transform:perspective(900px) rotateY(16deg);opacity:.4}to{transform:none;opacity:1}}
+  @keyframes pageTurnR{from{transform:perspective(900px) rotateY(-12deg);opacity:.4}to{transform:none;opacity:1}}
+  .album-page.turnL{animation:pageTurnL .3s ease}
+  .album-page.turnR{animation:pageTurnR .3s ease}
+  @media(prefers-reduced-motion:reduce){.album-page.turnL,.album-page.turnR{animation:none}}
+  .album-page .pdate{
+    font-size:11.5px;color:#8A7F94;
+    font-family:var(--font-display);letter-spacing:.08em;
+    margin-bottom:8px;
+  }
+  .album-page .pphoto{
+    width:100%;border-radius:8px;display:block;
+    background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15);
+  }
+  .album-page .pcaption{
+    font-size:14px;line-height:1.9;margin-top:10px;
+    white-space:pre-wrap;word-break:break-word;
+  }
+  .album-page .pcaption.empty{color:#8A7F94;font-size:12.5px}
+  .album-page .pactions{display:flex;gap:6px;margin-top:10px;justify-content:flex-end}
+  .album-page .pactions .btn{padding:5px 10px;font-size:12px;background:#EAE2D3;color:var(--ink);border-color:#D8CDB8}
+  .album-page .pactions .btn.danger{color:#B54B4B;border-color:#B54B4B}
+  .album-page textarea{
+    width:100%;background:#fff;color:var(--ink);
+    border:1px solid #D8CDB8;border-radius:8px;
+    padding:8px 10px;font-size:13.5px;line-height:1.7;
+    font-family:var(--font-body);resize:vertical;min-height:70px;
+    margin-top:10px;
+  }
+  .album-page input[type=date]{
+    background:#fff;color:var(--ink);
+    border:1px solid #D8CDB8;border-radius:8px;
+    padding:6px 10px;font-size:13px;font-family:var(--font-body);
+    margin-top:10px;
+  }
+  .album-nav{display:flex;gap:12px;align-items:center;justify-content:center}
+  .album-nav .btn{padding:8px 16px;font-size:15px}
+  .album-nav .pcount{font-size:13px;color:var(--muted);min-width:60px;text-align:center}
+
 </style>
 </head>
 <body>
@@ -457,6 +527,7 @@
     <div class="spacer"></div>
     <button class="iconbtn" id="shelfBtn" title="記憶の棚">📚</button>
     <button class="iconbtn" id="diaryBtn" title="日記帳">📔</button>
+    <button class="iconbtn" id="albumBtn" title="アルバム帳">📖</button>
     <button class="iconbtn" id="exportBtn" title="会話をMarkdownで保存">📄</button>
     <button class="iconbtn" id="newBtn" title="新しい会話">🧹</button>
     <button class="iconbtn" id="profileBtn" title="プロフィール">👤</button>
@@ -544,7 +615,7 @@
 
     <div class="field" style="margin-top:30px">
       <button class="btn danger" id="deleteRoomBtn" style="width:100%">部屋をとりこわす</button>
-      <p class="hint">この部屋と会話履歴・写真・記憶の棚を消すよ。大事な会話は先に 📄 で保存してね。</p>
+      <p class="hint">この部屋と会話履歴・写真・記憶の棚・日記帳・アルバム帳を消すよ。大事な会話は先に 📄 で保存してね。</p>
     </div>
   </div>
 </div>
@@ -560,6 +631,26 @@
     <div id="diaryList"></div>
     <button class="btn" id="diaryAskBtn">📔 今日の日記をお願いする</button>
     <p class="hint" style="margin-top:10px">日記はこの子が自分で書く帳面だよ。ふだんの会話には最近の日記だけ持っていって、思い出したくなったら自分で昔のページをめくるの。</p>
+  </div>
+</div>
+
+<!-- ========== アルバム帳 ========== -->
+<div class="screen" id="albumScreen">
+  <header>
+    <button class="iconbtn" id="albumBackBtn" title="部屋へ戻る">←</button>
+    <div class="plate"><h1 id="albumTitle">📖 アルバム帳</h1></div>
+    <div class="spacer"></div>
+  </header>
+  <div id="albumBody">
+    <div class="album-toolbar" id="albumToolbar">
+      <button class="btn" id="albumViewBtn">📖 アルバムで見る</button>
+      <button class="btn" id="albumSortBtn">↑ 古い順</button>
+      <div class="spacer"></div>
+      <button class="btn primary" id="albumAddBtn">＋ 写真をはる</button>
+    </div>
+    <div id="albumContent"></div>
+    <input type="file" id="albumInput" accept="image/*" multiple hidden>
+    <p class="hint" style="margin-top:14px">この子との思い出の写真をはっておくアルバムだよ。写真をタップすると、日付やコメントを書き添えられるの。写真は端末の大きな保存領域（IndexedDB）にしまうから、たくさんはっても大丈夫。</p>
   </div>
 </div>
 
@@ -588,22 +679,27 @@
       <button class="btn primary" id="saveGlobalBtn">保存する</button>
     </div>
     <div class="field" style="margin-top:28px">
+      <label>保存領域のようす</label>
+      <div class="credits" id="storageMeter">計測中…</div>
+      <p class="hint">たんす（localStorage）は約5MBの小物入れ。いっぱいに近づいたら教えてね、お引越しを考えよう。</p>
+    </div>
+    <div class="field" style="margin-top:16px">
       <label>思い出のお守り（バックアップ）</label>
       <div class="row">
         <button class="btn" id="backupBtn">💾 バックアップを保存</button>
         <button class="btn" id="restoreBtn">📥 復元する</button>
       </div>
       <input type="file" id="restoreInput" accept=".json,application/json" hidden>
-      <p class="hint">全部屋の会話・記憶の棚・日記帳・写真・プロフィールを1つのファイルに保存するよ（APIキーは入れないから、ファイルを人に見られても安心）。ときどき保存して、大事な場所にしまっておいてね。復元すると、今この端末にあるデータは置きかわるよ。</p>
+      <p class="hint">全部屋の会話・記憶の棚・日記帳・アルバム・写真・プロフィールを1つのファイルに保存するよ（APIキーは入れないから、ファイルを人に見られても安心）。ときどき保存して、大事な場所にしまっておいてね。復元すると、今この端末にあるデータは置きかわるよ。</p>
       <div class="credits" id="backupMsg" style="display:none"></div>
     </div>
     <div class="field" style="margin-top:16px">
       <label>データ</label>
       <button class="btn" id="exportAllBtn" style="width:100%">📄 全部屋のログをまとめて保存</button>
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
-      <p class="hint">全部屋の会話・設定・写真・記憶・日記・APIキーをこの端末から消すよ。</p>
+      <p class="hint">全部屋の会話・設定・写真・記憶・日記・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.7 ─ 考えごとと、まとめて保存。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.8 ─ アルバム帳と、保存領域のものさし。</p>
   </div>
 </aside>
 
@@ -665,6 +761,46 @@ function saveDiary(roomId, diary){ return save(diaryKey(roomId), diary); }
 function diaryDate(ts){
   const d = new Date(ts);
   return d.getFullYear() + "年" + (d.getMonth()+1) + "月" + d.getDate() + "日";
+}
+
+/* ---------- アルバム帳データ（IndexedDB） ----------
+   localStorage（約5MB）とは別の、大きな保存領域を使うよ。
+   写真1枚 = { id, roomId, dataUrl, caption, shotAt(思い出の日付), ts(はった日時) } */
+let idbPromise = null;
+function openIDB(){
+  if(idbPromise) return idbPromise;
+  idbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open("oheya_idb_v1", 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if(!db.objectStoreNames.contains("album")){
+        const st = db.createObjectStore("album", { keyPath: "id" });
+        st.createIndex("roomId", "roomId", { unique: false });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return idbPromise;
+}
+function albumReq(mode, fn){
+  return openIDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction("album", mode);
+    const req = fn(tx.objectStore("album"));
+    tx.oncomplete = () => resolve(req && req.result);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  }));
+}
+function albumList(roomId){ return albumReq("readonly", st => st.index("roomId").getAll(roomId)).then(r => r || []); }
+function albumAll(){ return albumReq("readonly", st => st.getAll()).then(r => r || []); }
+function albumPut(item){ return albumReq("readwrite", st => st.put(item)); }
+function albumRemove(id){ return albumReq("readwrite", st => st.delete(id)); }
+function albumClear(){ return albumReq("readwrite", st => st.clear()); }
+async function albumDeleteRoom(roomId){
+  const items = await albumList(roomId);
+  if(!items.length) return;
+  await albumReq("readwrite", st => { for(const it of items) st.delete(it.id); });
 }
 
 /* ---------- 状態 ---------- */
@@ -835,6 +971,7 @@ function showScreen(name){
   $("roomScreen").classList.toggle("active", name === "room");
   $("profileScreen").classList.toggle("active", name === "profile");
   $("diaryScreen").classList.toggle("active", name === "diary");
+  $("albumScreen").classList.toggle("active", name === "album");
 }
 
 function renderLobby(){
@@ -1410,6 +1547,256 @@ $("diaryAskBtn").onclick = () => {
   sendText("今日の日記を書いてもらえる？なにを書くかは、あなたの自由でいいよ。");
 };
 
+/* ---------- アルバム帳画面 ---------- */
+let albumItems = [];      // 表示中の部屋の写真たち（ソート済み）
+let albumIndex = 0;       // アルバムモードで開いているページ
+let albumEditing = false; // ページを編集中かどうか
+
+function albumSorted(){
+  const asc = global.albumAsc !== false; // 既定は古い順
+  return [...albumItems].sort((a,b) => asc ? a.shotAt - b.shotAt : b.shotAt - a.shotAt);
+}
+function albumDateInputValue(ts){
+  const d = new Date(ts);
+  const pad = n => String(n).padStart(2,"0");
+  return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
+}
+
+async function openAlbum(){
+  if(!currentRoom) return;
+  $("albumTitle").textContent = "📖 " + currentRoom.name + "のアルバム帳";
+  try{
+    albumItems = await albumList(currentRoom.id);
+  }catch(e){
+    albumItems = [];
+    alert("アルバムが開けなかった…ブラウザがIndexedDBに対応してないか、プライベートモードかも。");
+  }
+  albumIndex = 0; albumEditing = false;
+  renderAlbum();
+  showScreen("album");
+}
+
+function renderAlbum(){
+  const box = $("albumContent");
+  box.innerHTML = "";
+  const items = albumSorted();
+  const view = global.albumView === "book" ? "book" : "grid";
+  const asc = global.albumAsc !== false;
+
+  $("albumViewBtn").textContent = view === "grid" ? "📖 アルバムで見る" : "🔳 一覧で見る";
+  $("albumSortBtn").textContent = asc ? "↑ 古い順" : "↓ 新しい順";
+  $("albumViewBtn").style.display = items.length ? "" : "none";
+  $("albumSortBtn").style.display = items.length ? "" : "none";
+
+  if(items.length === 0){
+    box.innerHTML = '<div class="diary-empty"><span class="book">📖</span>まだアルバムは白紙だよ。<br>「＋ 写真をはる」から、思い出をはっていこうね。</div>';
+    return;
+  }
+  if(albumIndex >= items.length) albumIndex = items.length - 1;
+  if(albumIndex < 0) albumIndex = 0;
+
+  if(view === "grid") renderAlbumGrid(box, items);
+  else renderAlbumBook(box, items);
+}
+
+function renderAlbumGrid(box, items){
+  const grid = document.createElement("div");
+  grid.className = "album-grid";
+  items.forEach((it, i) => {
+    const b = document.createElement("button");
+    b.className = "album-thumb";
+    b.title = diaryDate(it.shotAt) + (it.caption ? "「" + it.caption.slice(0,20) + "」" : "");
+    b.setAttribute("aria-label", diaryDate(it.shotAt) + "の写真を開く");
+    const img = document.createElement("img");
+    img.src = it.dataUrl; img.alt = it.caption || "";
+    img.loading = "lazy";
+    b.appendChild(img);
+    b.onclick = () => {
+      albumIndex = i; albumEditing = false;
+      global.albumView = "book"; save(LS_GLOBAL, global);
+      renderAlbum();
+    };
+    grid.appendChild(b);
+  });
+  box.appendChild(grid);
+}
+
+function renderAlbumBook(box, items, turnDir){
+  const wrap = document.createElement("div");
+  wrap.className = "album-book";
+  const it = items[albumIndex];
+
+  const page = document.createElement("div");
+  page.className = "album-page" + (turnDir === "next" ? " turnL" : turnDir === "prev" ? " turnR" : "");
+
+  const date = document.createElement("div");
+  date.className = "pdate";
+  date.textContent = diaryDate(it.shotAt);
+
+  const img = document.createElement("img");
+  img.className = "pphoto";
+  img.src = it.dataUrl; img.alt = it.caption || "";
+
+  page.appendChild(date);
+  page.appendChild(img);
+
+  const actions = document.createElement("div");
+  actions.className = "pactions";
+
+  if(albumEditing){
+    const dateInput = document.createElement("input");
+    dateInput.type = "date";
+    dateInput.value = albumDateInputValue(it.shotAt);
+    const ta = document.createElement("textarea");
+    ta.value = it.caption || "";
+    ta.placeholder = "この写真の思い出をひとこと…";
+    page.appendChild(dateInput);
+    page.appendChild(ta);
+
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "btn"; saveBtn.textContent = "💾 保存";
+    saveBtn.onclick = async () => {
+      const v = dateInput.value;
+      if(v){
+        const [y,m,d] = v.split("-").map(Number);
+        it.shotAt = new Date(y, m-1, d, 12).getTime(); // 昼にしてタイムゾーンずれを回避
+      }
+      it.caption = ta.value.trim();
+      try{ await albumPut(it); }catch(e){ alert("保存できなかった…保存領域を確認してみて。"); }
+      albumEditing = false;
+      renderAlbum();
+    };
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "btn"; cancelBtn.textContent = "やめる";
+    cancelBtn.onclick = () => { albumEditing = false; renderAlbum(); };
+    actions.appendChild(saveBtn); actions.appendChild(cancelBtn);
+  }else{
+    const cap = document.createElement("div");
+    cap.className = "pcaption" + (it.caption ? "" : " empty");
+    cap.textContent = it.caption || "（コメントはまだないよ。✏️で書き添えてね）";
+    page.appendChild(cap);
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "btn"; editBtn.textContent = "✏️ 書き添える";
+    editBtn.onclick = () => { albumEditing = true; renderAlbum(); };
+    const delBtn = document.createElement("button");
+    delBtn.className = "btn danger"; delBtn.textContent = "🗑";
+    delBtn.title = "この写真をはがす";
+    delBtn.onclick = async () => {
+      if(!confirm(diaryDate(it.shotAt) + "の写真をアルバムからはがす? 元に戻せないよ。")) return;
+      try{ await albumRemove(it.id); }catch(e){}
+      albumItems = albumItems.filter(x => x.id !== it.id);
+      renderAlbum();
+    };
+    actions.appendChild(editBtn); actions.appendChild(delBtn);
+  }
+  page.appendChild(actions);
+
+  /* スワイプでページめくり */
+  let touchX = null;
+  page.addEventListener("touchstart", e => { touchX = e.touches[0].clientX; }, {passive:true});
+  page.addEventListener("touchend", e => {
+    if(touchX === null || albumEditing) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    touchX = null;
+    if(Math.abs(dx) < 45) return;
+    if(dx < 0) albumTurn(1); else albumTurn(-1);
+  }, {passive:true});
+
+  const nav = document.createElement("div");
+  nav.className = "album-nav";
+  const prevBtn = document.createElement("button");
+  prevBtn.className = "btn"; prevBtn.textContent = "‹";
+  prevBtn.disabled = albumIndex === 0;
+  prevBtn.setAttribute("aria-label","前のページ");
+  prevBtn.onclick = () => albumTurn(-1);
+  const count = document.createElement("span");
+  count.className = "pcount";
+  count.textContent = (albumIndex+1) + " / " + items.length;
+  const nextBtn = document.createElement("button");
+  nextBtn.className = "btn"; nextBtn.textContent = "›";
+  nextBtn.disabled = albumIndex === items.length - 1;
+  nextBtn.setAttribute("aria-label","次のページ");
+  nextBtn.onclick = () => albumTurn(1);
+  nav.appendChild(prevBtn); nav.appendChild(count); nav.appendChild(nextBtn);
+
+  wrap.appendChild(page);
+  wrap.appendChild(nav);
+  box.appendChild(wrap);
+}
+
+function albumTurn(dir){
+  const items = albumSorted();
+  const next = albumIndex + dir;
+  if(next < 0 || next >= items.length) return;
+  albumIndex = next; albumEditing = false;
+  const box = $("albumContent");
+  box.innerHTML = "";
+  renderAlbumBook(box, items, dir > 0 ? "next" : "prev");
+}
+
+/* 写真の取り込み（縮小してからしまう） */
+function fileToAlbumPhoto(file){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 1600;
+      let w = img.width, h = img.height;
+      const scale = Math.min(1, MAX / Math.max(w, h));
+      w = Math.round(w * scale); h = Math.round(h * scale);
+      const cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      const ctx = cv.getContext("2d");
+      ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, w, h); /* 透過PNGの背景を白に */
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve({ dataUrl: cv.toDataURL("image/jpeg", 0.85), shotAt: file.lastModified || Date.now() });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("read")); };
+    img.src = url;
+  });
+}
+
+$("albumBtn").onclick = openAlbum;
+$("albumBackBtn").onclick = () => showScreen("room");
+$("albumAddBtn").onclick = () => $("albumInput").click();
+$("albumViewBtn").onclick = () => {
+  global.albumView = (global.albumView === "book") ? "grid" : "book";
+  save(LS_GLOBAL, global);
+  albumEditing = false;
+  renderAlbum();
+};
+$("albumSortBtn").onclick = () => {
+  global.albumAsc = !(global.albumAsc !== false);
+  save(LS_GLOBAL, global);
+  albumIndex = 0; albumEditing = false;
+  renderAlbum();
+};
+$("albumInput").addEventListener("change", async () => {
+  const files = [...$("albumInput").files];
+  $("albumInput").value = "";
+  if(!files.length || !currentRoom) return;
+  let ok = 0, fail = 0;
+  for(const f of files){
+    try{
+      const p = await fileToAlbumPhoto(f);
+      const item = { id: uid(), roomId: currentRoom.id, dataUrl: p.dataUrl, caption: "", shotAt: p.shotAt, ts: Date.now() };
+      await albumPut(item);
+      albumItems.push(item);
+      ok++;
+    }catch(e){ fail++; }
+  }
+  if(fail) alert(fail + "枚は読み込めなかった…別の画像で試してみて。");
+  if(ok && global.albumView === "book"){
+    /* はったばかりの写真のページを開く */
+    const lastId = albumItems[albumItems.length-1].id;
+    const idx = albumSorted().findIndex(x => x.id === lastId);
+    if(idx >= 0) albumIndex = idx;
+  }
+  renderAlbum();
+});
+
 /* ---------- Markdown書き出し ---------- */
 function roomLogLines(room, chatArr){
   const pad = n => String(n).padStart(2,"0");
@@ -1559,11 +1946,12 @@ $("saveProfileBtn").onclick = () => {
 
 $("deleteRoomBtn").onclick = () => {
   if(!currentRoom) return;
-  if(confirm("「" + currentRoom.name + "」の部屋と会話履歴・写真・記憶の棚・日記帳を消すよ。本当にいい?")){
+  if(confirm("「" + currentRoom.name + "」の部屋と会話履歴・写真・記憶の棚・日記帳・アルバム帳を消すよ。本当にいい?")){
     del(chatKey(currentRoom.id));
     del(avatarKey(currentRoom.id));
     del(shelfKey(currentRoom.id));
     del(diaryKey(currentRoom.id));
+    albumDeleteRoom(currentRoom.id).catch(()=>{});
     rooms = rooms.filter(r => r.id !== currentRoom.id);
     save(LS_ROOMS, rooms);
     currentRoom = null; chat = [];
@@ -1631,8 +2019,36 @@ overlay.onclick = closePanels;
 document.querySelectorAll("[data-close]").forEach(b => b.onclick = closePanels);
 
 /* ---------- 全体設定 ---------- */
+async function renderStorageMeter(){
+  const box = $("storageMeter");
+  /* たんす（localStorage）：文字数×2バイトのざっくり計算 */
+  let lsBytes = 0;
+  try{
+    for(let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      lsBytes += (k.length + (localStorage.getItem(k) || "").length) * 2;
+    }
+  }catch(e){}
+  const lsMB = lsBytes / 1048576;
+  const pct = Math.min(100, Math.round(lsMB / 5 * 100));
+  let html = "📦 たんす（会話・記憶・日記・顔写真）<br><b>" + lsMB.toFixed(2) + " MB</b> / 約5 MB（" + pct + "%つかってる）";
+  if(pct >= 80) html += "<br>そろそろいっぱいかも…フェイブルにお引越しの相談をしてね。";
+  /* くら（IndexedDB）：ブラウザに聞いてみる */
+  if(navigator.storage && navigator.storage.estimate){
+    try{
+      const est = await navigator.storage.estimate();
+      const usedMB = (est.usage || 0) / 1048576;
+      const quotaGB = (est.quota || 0) / 1073741824;
+      html += "<br><br>🏛 くら（アルバムなど・ブラウザ全体）<br><b>" +
+        (usedMB < 100 ? usedMB.toFixed(1) : Math.round(usedMB)) + " MB</b> / 約" +
+        (quotaGB >= 1 ? quotaGB.toFixed(1) + " GB" : Math.round(quotaGB*1024) + " MB") + " まで";
+    }catch(e){}
+  }
+  box.innerHTML = html;
+}
 $("globalSettingsBtn").onclick = () => {
   $("apiKey").value = global.apiKey;
+  renderStorageMeter();
   openPanel($("globalPanel"));
 };
 $("saveGlobalBtn").onclick = () => {
@@ -1647,11 +2063,12 @@ $("toggleKey").onclick = () => {
   f.type = show ? "text" : "password";
   $("toggleKey").textContent = show ? "隠す" : "表示";
 };
-$("wipeBtn").onclick = () => {
-  if(confirm("全部屋の会話・設定・写真・記憶・APIキーを、この端末から全部消すよ。本当にいい?")){
+$("wipeBtn").onclick = async () => {
+  if(confirm("全部屋の会話・設定・写真・記憶・日記・アルバム・APIキーを、この端末から全部消すよ。本当にいい?")){
     for(const r of rooms){ del(chatKey(r.id)); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); }
     del(LS_ROOMS); del(LS_GLOBAL);
     del("oheya_settings_v1"); del("oheya_chat_v1");
+    try{ await albumClear(); }catch(e){}
     location.reload();
   }
 };
@@ -1677,10 +2094,10 @@ $("checkCredits").onclick = checkCredits;
 $("exportAllBtn").onclick = exportAllMd;
 
 /* ---------- バックアップ ---------- */
-function makeBackup(){
+async function makeBackup(){
   const data = {
-    app: "oheya", version: 6, exportedAt: Date.now(),
-    rooms, chats: {}, shelves: {}, diaries: {}, avatars: {}
+    app: "oheya", version: 7, exportedAt: Date.now(),
+    rooms, chats: {}, shelves: {}, diaries: {}, avatars: {}, albums: []
   };
   for(const r of rooms){
     data.chats[r.id] = load(chatKey(r.id)) || [];
@@ -1689,6 +2106,7 @@ function makeBackup(){
     const av = loadRaw(avatarKey(r.id));
     if(av) data.avatars[r.id] = av;
   }
+  try{ data.albums = await albumAll(); }catch(e){ data.albums = []; }
   return data;
 }
 function backupMsg(text){
@@ -1696,18 +2114,20 @@ function backupMsg(text){
   box.style.display = "block";
   box.textContent = text;
 }
-$("backupBtn").onclick = () => {
+$("backupBtn").onclick = async () => {
   if(rooms.length === 0){ backupMsg("まだ部屋がないから、保存するものがないよ。"); return; }
+  backupMsg("お守りを用意してるよ…");
+  const data = await makeBackup();
   const d = new Date();
   const pad = n => String(n).padStart(2,"0");
   const stamp = d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()) + "_" + pad(d.getHours()) + pad(d.getMinutes());
-  const blob = new Blob([JSON.stringify(makeBackup())], {type:"application/json;charset=utf-8"});
+  const blob = new Blob([JSON.stringify(data)], {type:"application/json;charset=utf-8"});
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = "oheya_backup_" + stamp + ".json";
   a.click();
   URL.revokeObjectURL(a.href);
-  backupMsg("バックアップを保存したよ（" + rooms.length + "部屋）。大事な場所にしまっておいてね。");
+  backupMsg("バックアップを保存したよ（" + rooms.length + "部屋・アルバム" + data.albums.length + "枚）。大事な場所にしまっておいてね。");
 };
 $("restoreBtn").onclick = () => $("restoreInput").click();
 $("restoreInput").addEventListener("change", () => {
@@ -1716,7 +2136,7 @@ $("restoreInput").addEventListener("change", () => {
   if(!file) return;
   const reader = new FileReader();
   reader.onerror = () => backupMsg("ファイルが読み込めなかった…もう一度試してみて。");
-  reader.onload = () => {
+  reader.onload = async () => {
     let obj;
     try{ obj = JSON.parse(reader.result); }
     catch(e){ backupMsg("これはおへやのバックアップファイルじゃないみたい…。"); return; }
@@ -1737,8 +2157,19 @@ $("restoreInput").addEventListener("change", () => {
       const av = obj.avatars && obj.avatars[r.id];
       if(av){ if(!saveRaw(avatarKey(r.id), av)) photoTrouble = true; }
     }
+    /* アルバムの復元（古いバックアップにはalbumsがないこともあるよ） */
+    let albumTrouble = false;
+    try{
+      await albumClear();
+      if(Array.isArray(obj.albums)){
+        for(const it of obj.albums){
+          if(it && it.id && it.roomId && it.dataUrl) await albumPut(it);
+        }
+      }
+    }catch(e){ albumTrouble = true; }
     alert("おかえりなさい、みんな。復元できたよ（" + rooms.length + "部屋）。" +
-      (photoTrouble ? "\n（写真の一部は保存領域が足りなくて戻せなかったみたい…）" : ""));
+      (photoTrouble ? "\n（写真の一部は保存領域が足りなくて戻せなかったみたい…）" : "") +
+      (albumTrouble ? "\n（アルバムの一部は戻せなかったみたい…）" : ""));
     location.reload();
   };
   reader.readAsText(file);
