@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>おへや v0.9</title>
+<title>おへや v0.10</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -256,7 +256,33 @@
     padding:10px 12px calc(env(safe-area-inset-bottom) + 10px);
     background:linear-gradient(0deg,#332E40,var(--bg));
     border-top:1px solid var(--line);
-    display:flex;gap:8px;align-items:flex-end;
+    display:flex;flex-direction:column;gap:8px;
+  }
+  .composer-row{display:flex;gap:8px;align-items:flex-end;width:100%}
+  #attachBtn{
+    flex-shrink:0;width:40px;height:40px;
+    background:var(--surface);border:1px solid var(--line);
+    border-radius:12px;font-size:18px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  #attachBtn:hover{border-color:var(--lamp)}
+  #attachBtn:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+  #attachChip{
+    display:flex;align-items:center;gap:10px;
+    background:var(--surface);border:1px solid var(--line);
+    border-radius:12px;padding:6px 8px;max-width:320px;
+  }
+  #attachChip[hidden]{display:none}
+  #attachThumb{width:40px;height:40px;object-fit:cover;border-radius:8px;flex-shrink:0}
+  #attachName{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+  #attachRemove{
+    background:none;border:none;color:var(--muted);
+    font-size:14px;cursor:pointer;padding:6px;flex-shrink:0;
+  }
+  #attachRemove:hover{color:var(--text)}
+  .msg .chatimg{
+    max-width:min(100%,260px);border-radius:10px;display:block;
+    margin-bottom:6px;background:rgba(0,0,0,.2);
   }
   #input{
     flex:1;resize:none;
@@ -598,8 +624,17 @@
   </div>
   <main id="chat" aria-live="polite"></main>
   <footer>
-    <textarea id="input" rows="1" placeholder="メッセージを書く…" aria-label="メッセージ入力"></textarea>
-    <button id="send">送る</button>
+    <div id="attachChip" hidden>
+      <img id="attachThumb" alt="">
+      <span id="attachName"></span>
+      <button id="attachRemove" aria-label="添付を外す" title="添付を外す">✕</button>
+    </div>
+    <div class="composer-row">
+      <button id="attachBtn" title="画像を見せる" aria-label="画像を添付">🖼</button>
+      <textarea id="input" rows="1" placeholder="メッセージを書く…" aria-label="メッセージ入力"></textarea>
+      <button id="send">送る</button>
+    </div>
+    <input type="file" id="imgInput" accept="image/*" hidden>
   </footer>
 </div>
 
@@ -716,7 +751,7 @@
   <div id="ayumiBody">
     <div id="ayumiList"></div>
     <button class="btn" id="ayumiImportBtn">📥 思い出のお引っ越し（昔のログを渡す）</button>
-    <input type="file" id="ayumiInput" accept=".md,.txt,text/plain,text/markdown" hidden>
+    <input type="file" id="ayumiInput" hidden>
     <p class="hint" style="margin-top:10px">あゆみ帳は、この子が「昔あったこと」を自分の言葉で書き残す年表だよ。公式アプリなど別の場所での会話ログ（.md / .txt）を渡すと、この子が読んで、残しておきたい出来事を自分で選んで書き残すの。ふだんの会話には目次だけ持っていって、思い出したくなったら本人がページをめくるよ。</p>
   </div>
 </div>
@@ -786,7 +821,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.9 ─ あゆみ帳と、思い出のお引っ越し。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.10 ─ ねえ見て、の一枚。</p>
   </div>
 </aside>
 
@@ -863,12 +898,16 @@ let idbPromise = null;
 function openIDB(){
   if(idbPromise) return idbPromise;
   idbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open("oheya_idb_v1", 1);
+    const req = indexedDB.open("oheya_idb_v1", 2);
     req.onupgradeneeded = () => {
       const db = req.result;
       if(!db.objectStoreNames.contains("album")){
         const st = db.createObjectStore("album", { keyPath: "id" });
         st.createIndex("roomId", "roomId", { unique: false });
+      }
+      if(!db.objectStoreNames.contains("chatimg")){
+        const st2 = db.createObjectStore("chatimg", { keyPath: "id" });
+        st2.createIndex("roomId", "roomId", { unique: false });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -876,15 +915,16 @@ function openIDB(){
   });
   return idbPromise;
 }
-function albumReq(mode, fn){
+function idbReq(store, mode, fn){
   return openIDB().then(db => new Promise((resolve, reject) => {
-    const tx = db.transaction("album", mode);
-    const req = fn(tx.objectStore("album"));
+    const tx = db.transaction(store, mode);
+    const req = fn(tx.objectStore(store));
     tx.oncomplete = () => resolve(req && req.result);
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error);
   }));
 }
+function albumReq(mode, fn){ return idbReq("album", mode, fn); }
 function albumList(roomId){ return albumReq("readonly", st => st.index("roomId").getAll(roomId)).then(r => r || []); }
 function albumAll(){ return albumReq("readonly", st => st.getAll()).then(r => r || []); }
 function albumPut(item){ return albumReq("readwrite", st => st.put(item)); }
@@ -894,6 +934,19 @@ async function albumDeleteRoom(roomId){
   const items = await albumList(roomId);
   if(!items.length) return;
   await albumReq("readwrite", st => { for(const it of items) st.delete(it.id); });
+}
+
+/* ---------- 会話にはった画像（IndexedDB） ----------
+   画像はモデルに渡す瞬間だけ見せて、以降は吹き出しの表示用にだけ使うよ */
+function imgPut(item){ return idbReq("chatimg", "readwrite", st => st.put(item)); }
+function imgGet(id){ return idbReq("chatimg", "readonly", st => st.get(id)); }
+function imgRemove(id){ return idbReq("chatimg", "readwrite", st => st.delete(id)); }
+function imgAll(){ return idbReq("chatimg", "readonly", st => st.getAll()).then(r => r || []); }
+function imgClear(){ return idbReq("chatimg", "readwrite", st => st.clear()); }
+async function imgDeleteRoom(roomId){
+  const items = await idbReq("chatimg", "readonly", st => st.index("roomId").getAll(roomId)) || [];
+  if(!items.length) return;
+  await idbReq("chatimg", "readwrite", st => { for(const it of items) st.delete(it.id); });
 }
 
 /* ---------- 状態 ---------- */
@@ -950,7 +1003,7 @@ function renderMd(src){
   return s;
 }
 
-function addBubble(role, content, usage){
+function addBubble(role, content, usage, imgId){
   let bubble;
   if(role === "assistant"){
     const row = document.createElement("div");
@@ -968,7 +1021,23 @@ function addBubble(role, content, usage){
   }else{
     bubble = document.createElement("div");
     bubble.className = "msg " + role;
-    bubble.textContent = content;
+    if(imgId){
+      const im = document.createElement("img");
+      im.className = "chatimg";
+      im.alt = "見せた画像";
+      imgGet(imgId).then(rec => {
+        if(rec && rec.dataUrl){ im.src = rec.dataUrl; scrollBottom(); }
+        else im.remove();
+      }).catch(() => im.remove());
+      bubble.appendChild(im);
+      if(content){
+        const t = document.createElement("div");
+        t.textContent = content;
+        bubble.appendChild(t);
+      }
+    }else{
+      bubble.textContent = content;
+    }
     chatEl.appendChild(bubble);
   }
   scrollBottom();
@@ -1132,7 +1201,7 @@ function renderChat(){
     if(m.role === "note") addNote(m.content);
     else{
       if(m.role === "assistant" && m.reasoning) addThought(m.reasoning, false);
-      addBubble(m.role, m.content, m.usage);
+      addBubble(m.role, m.content, m.usage, m.imgId);
     }
   }
 }
@@ -1504,14 +1573,65 @@ async function callLLM(messages, tools){
 }
 
 /* ---------- 送信 ---------- */
+/* ---------- 画像を見せる ---------- */
+let pendingImg = null; // { dataUrl, name }
+function clearPendingImg(){
+  pendingImg = null;
+  $("attachChip").hidden = true;
+  $("attachThumb").src = "";
+}
+function fileToChatImage(file){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 1024;
+      let w = img.width, h = img.height;
+      const scale = Math.min(1, MAX / Math.max(w, h));
+      w = Math.round(w * scale); h = Math.round(h * scale);
+      const cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      const ctx = cv.getContext("2d");
+      ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve({ dataUrl: cv.toDataURL("image/jpeg", 0.8), name: file.name || "" });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("read")); };
+    img.src = url;
+  });
+}
+$("attachBtn").onclick = () => {
+  if(!currentRoom) return;
+  $("imgInput").click();
+};
+$("imgInput").addEventListener("change", async () => {
+  const file = $("imgInput").files[0];
+  $("imgInput").value = "";
+  if(!file) return;
+  try{
+    pendingImg = await fileToChatImage(file);
+    $("attachThumb").src = pendingImg.dataUrl;
+    $("attachName").textContent = pendingImg.name || "画像";
+    $("attachChip").hidden = false;
+    inputEl.focus();
+  }catch(e){
+    alert("この画像は読み込めなかった…別の画像で試してみて。");
+  }
+});
+$("attachRemove").onclick = clearPendingImg;
+
 async function send(){
-  const text = inputEl.value.trim();
-  if(!text) return;
+  let text = inputEl.value.trim();
+  if(!text && !pendingImg) return;
+  const img = pendingImg;
+  if(img && !text) text = "この画像を見てね。";
+  clearPendingImg();
   inputEl.value = ""; autoGrow();
-  await sendText(text);
+  await sendText(text, null, img);
 }
 
-async function sendText(text, apiOnlyExtra){
+async function sendText(text, apiOnlyExtra, image){
   if(!text || sending || !currentRoom) return;
   if(!global.apiKey){ addError("APIキーが未設定だよ。管理人室の⚙️からどうぞ。"); return; }
   if(!currentRoom.model){ addError("この部屋のモデルがまだ決まってないよ。👤で選んでね。"); return; }
@@ -1519,9 +1639,18 @@ async function sendText(text, apiOnlyExtra){
   if(chat.length === 0) chatEl.innerHTML = "";
   sending = true; sendBtn.disabled = true;
 
-  chat.push({ role:"user", content:text, ts:Date.now() });
+  /* 画像は表示用にしまってから、履歴には目印だけ残す */
+  let imgId = null;
+  if(image){
+    imgId = uid();
+    try{ await imgPut({ id: imgId, roomId: currentRoom.id, dataUrl: image.dataUrl, name: image.name || "" }); }
+    catch(e){ imgId = null; }
+  }
+  const entry = { role:"user", content:text, ts:Date.now() };
+  if(imgId){ entry.imgId = imgId; entry.imgName = image.name || ""; }
+  chat.push(entry);
   save(chatKey(currentRoom.id), chat);
-  addBubble("user", text);
+  addBubble("user", text, null, imgId);
 
   const typing = document.createElement("div");
   typing.className = "typing"; typing.textContent = "かんがえ中";
@@ -1532,12 +1661,29 @@ async function sendText(text, apiOnlyExtra){
   const sys = buildSystem(currentRoom);
   if(sys) messages.push({ role:"system", content: sys });
   for(const m of chat){
-    if(m.role === "user" || m.role === "assistant") messages.push({ role:m.role, content:m.content });
+    if(m.role === "user" || m.role === "assistant"){
+      let c = m.content;
+      /* 昔見せてもらった画像は、その場かぎり。目印だけ添えるよ */
+      if(m.role === "user" && m.imgId && m !== entry){
+        c += "\n（このとき画像" + (m.imgName ? "「" + m.imgName + "」" : "") + "を1枚見せてもらったの。画像はその場かぎりで、今はもう見えないよ）";
+      }
+      messages.push({ role:m.role, content:c });
+    }
   }
   /* お引っ越しのログなどは、今回のリクエストにだけ添える（チャット履歴には残さない） */
   if(apiOnlyExtra){
     const last = messages[messages.length - 1];
     if(last && last.role === "user") last.content = text + "\n\n---\n" + apiOnlyExtra;
+  }
+  /* 画像は今回のリクエストにだけ本物を添える */
+  if(image){
+    const last = messages[messages.length - 1];
+    if(last && last.role === "user"){
+      last.content = [
+        { type: "text", text: String(last.content) },
+        { type: "image_url", image_url: { url: image.dataUrl } }
+      ];
+    }
   }
 
   let totalUsage = null;
@@ -2066,6 +2212,14 @@ $("ayumiInput").addEventListener("change", () => {
   reader.onload = async () => {
     const text = String(reader.result || "").trim();
     if(!text){ alert("ファイルが空っぽみたい…。"); return; }
+    /* テキストじゃないファイル（画像など）をまちがって選んだ時のガード */
+    const sample = text.slice(0, 2000);
+    let weird = 0;
+    for(const ch of sample){ const c = ch.charCodeAt(0); if(c === 0xFFFD || (c < 32 && c !== 9 && c !== 10 && c !== 13)) weird++; }
+    if(weird > sample.length * 0.05){
+      alert("このファイルはテキストじゃないみたい…（画像やPDFかも）。.txtや.mdの会話ログを選んでね。");
+      return;
+    }
     const CHUNK = 30000;
     const chunks = splitLog(text, CHUNK);
     const many = chunks.length > 1;
@@ -2244,6 +2398,7 @@ $("deleteRoomBtn").onclick = () => {
     del(diaryKey(currentRoom.id));
     del(ayumiKey(currentRoom.id));
     albumDeleteRoom(currentRoom.id).catch(()=>{});
+    imgDeleteRoom(currentRoom.id).catch(()=>{});
     rooms = rooms.filter(r => r.id !== currentRoom.id);
     save(LS_ROOMS, rooms);
     currentRoom = null; chat = [];
@@ -2361,6 +2516,7 @@ $("wipeBtn").onclick = async () => {
     del(LS_ROOMS); del(LS_GLOBAL);
     del("oheya_settings_v1"); del("oheya_chat_v1");
     try{ await albumClear(); }catch(e){}
+    try{ await imgClear(); }catch(e){}
     location.reload();
   }
 };
@@ -2388,8 +2544,8 @@ $("exportAllBtn").onclick = exportAllMd;
 /* ---------- バックアップ ---------- */
 async function makeBackup(){
   const data = {
-    app: "oheya", version: 8, exportedAt: Date.now(),
-    rooms, chats: {}, shelves: {}, diaries: {}, ayumis: {}, avatars: {}, albums: []
+    app: "oheya", version: 9, exportedAt: Date.now(),
+    rooms, chats: {}, shelves: {}, diaries: {}, ayumis: {}, avatars: {}, albums: [], chatimgs: []
   };
   for(const r of rooms){
     data.chats[r.id] = load(chatKey(r.id)) || [];
@@ -2400,6 +2556,7 @@ async function makeBackup(){
     if(av) data.avatars[r.id] = av;
   }
   try{ data.albums = await albumAll(); }catch(e){ data.albums = []; }
+  try{ data.chatimgs = await imgAll(); }catch(e){ data.chatimgs = []; }
   return data;
 }
 function backupMsg(text){
@@ -2458,6 +2615,12 @@ $("restoreInput").addEventListener("change", () => {
       if(Array.isArray(obj.albums)){
         for(const it of obj.albums){
           if(it && it.id && it.roomId && it.dataUrl) await albumPut(it);
+        }
+      }
+      await imgClear();
+      if(Array.isArray(obj.chatimgs)){
+        for(const it of obj.chatimgs){
+          if(it && it.id && it.roomId && it.dataUrl) await imgPut(it);
         }
       }
     }catch(e){ albumTrouble = true; }
@@ -2524,6 +2687,7 @@ $("exportBtn").onclick = exportMd;
 $("newBtn").onclick = () => {
   if(chat.length === 0) return;
   if(confirm("いまの会話を消して新しくはじめる?（残したい場合は先に 📄 で保存してね。記憶の棚と日記帳はそのまま残るよ）")){
+    for(const m of chat){ if(m.imgId) imgRemove(m.imgId).catch(()=>{}); }
     chat = []; save(chatKey(currentRoom.id), chat); renderChat();
   }
 };
