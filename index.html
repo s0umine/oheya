@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>おへや v0.11</title>
+<title>おへや v0.12</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -486,14 +486,14 @@
   .ayumi-entry{
     background:var(--paper);color:var(--ink);
     border-radius:4px 14px 14px 4px;
-    border-left:4px solid #8FA88A;
+    border-left:4px solid var(--lamp);
     padding:16px 18px 14px;margin-bottom:16px;
     box-shadow:0 3px 10px rgba(0,0,0,.3);
     position:relative;
   }
   .ayumi-entry .koro{
-    display:inline-block;font-size:11px;color:#5E7059;
-    background:rgba(143,168,138,.18);border:1px solid rgba(143,168,138,.5);
+    display:inline-block;font-size:11px;color:var(--ink);
+    background:var(--lamp-soft);border:1px solid var(--lamp);
     border-radius:99px;padding:2px 10px;margin-bottom:6px;
     font-family:var(--font-display);letter-spacing:.06em;
   }
@@ -643,6 +643,56 @@
     border-color:#fff;
     box-shadow:0 0 0 2px var(--lamp),0 0 12px 2px var(--lamp-soft);
   }
+  .theme-swatch.rainbow{
+    background:conic-gradient(#F2A65A,#F2A0B5,#B49AE0,#7EB8DE,#9FCE8F,#E5D06E,#F2A65A);
+  }
+  .colorpick{
+    display:flex;align-items:center;gap:8px;
+    font-size:13px;color:var(--muted);
+  }
+  .colorpick input[type=color]{
+    width:44px;height:34px;padding:2px;cursor:pointer;
+    background:var(--surface);border:1px solid var(--line);border-radius:8px;
+  }
+
+  /* ---------- 顔写真のうつり調整（クロップ） ---------- */
+  #cropModal{
+    position:fixed;inset:0;z-index:40;display:none;
+    align-items:center;justify-content:center;
+    background:rgba(20,17,28,.72);padding:16px;
+  }
+  #cropModal.show{display:flex}
+  .crop-card{
+    background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--radius);padding:18px;
+    width:min(360px,100%);
+    display:flex;flex-direction:column;gap:14px;
+  }
+  .crop-card h3{
+    font-family:var(--font-display);font-size:15px;font-weight:700;
+    text-align:center;
+  }
+  #cropFrame{
+    width:260px;height:260px;margin:0 auto;
+    position:relative;overflow:hidden;border-radius:12px;
+    background:#1E1A28;touch-action:none;cursor:grab;
+  }
+  #cropFrame.dragging{cursor:grabbing}
+  #cropImg{
+    position:absolute;left:0;top:0;
+    user-select:none;-webkit-user-drag:none;pointer-events:none;
+    max-width:none;
+  }
+  /* 円形ガイド（保存は四角だけど、ふだんは丸く表示されるから） */
+  #cropFrame::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    border-radius:50%;
+    box-shadow:0 0 0 999px rgba(20,17,28,.45);
+  }
+  .crop-zoom{display:flex;align-items:center;gap:10px;font-size:15px}
+  .crop-zoom input[type=range]{flex:1;accent-color:var(--lamp)}
+  .crop-actions{display:flex;gap:10px}
+  .crop-actions .btn{flex:1}
 
 </style>
 </head>
@@ -728,7 +778,14 @@
     <div class="field">
       <label>お部屋のあかり（テーマカラー）</label>
       <div class="theme-swatches" id="themeSwatches"></div>
-      <p class="hint">この子の部屋のランプの色を選べるよ。選ぶとその場で灯りが変わるから、雰囲気を見ながら決めてね。</p>
+      <div id="customColorRow" style="display:none;margin-top:12px">
+        <div class="row" style="gap:14px;flex-wrap:wrap">
+          <label class="colorpick">あかりの色<input type="color" id="customLampInput"></label>
+          <label class="colorpick">ふきだしの色<input type="color" id="customUserInput"></label>
+        </div>
+        <p class="hint">あかりはボタンや飾りに、ふきだしはあなたの吹き出しに使うよ。ふきだしは白文字がのるから、暗めの色がおすすめ。</p>
+      </div>
+      <p class="hint">この子の部屋のランプの色を選べるよ。選ぶとその場で灯りが変わるから、雰囲気を見ながら決めてね。🎨は自分で色を作れるの。</p>
     </div>
     <div class="field">
       <label for="modelSearch">モデル</label>
@@ -844,6 +901,23 @@
 
 <div id="overlay"></div>
 
+<!-- ========== 顔写真のうつり調整 ========== -->
+<div id="cropModal" role="dialog" aria-label="顔写真のうつり調整">
+  <div class="crop-card">
+    <h3>見せたいところを決めてね</h3>
+    <div id="cropFrame">
+      <img id="cropImg" alt="">
+    </div>
+    <div class="crop-zoom">
+      🔍<input type="range" id="cropZoom" min="100" max="300" value="100" aria-label="拡大縮小">
+    </div>
+    <div class="crop-actions">
+      <button class="btn" id="cropCancelBtn">やめる</button>
+      <button class="btn primary" id="cropOkBtn">これでいい！</button>
+    </div>
+  </div>
+</div>
+
 <!-- ========== さがしもの（全部屋検索） ========== -->
 <div class="screen" id="searchScreen">
   <header>
@@ -901,7 +975,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.11 ─ さがしものと、もようがえ。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.12 ─ じぶんいろと、おすましショット。</p>
   </div>
 </aside>
 
@@ -964,20 +1038,32 @@ const THEMES = [
   { key:"mizuumi",name:"みずうみ", emoji:"🌊", lamp:"#7EB8DE", user:"#465A78" },
   { key:"sumire", name:"すみれ",   emoji:"💜", lamp:"#B49AE0", user:"#5A4A78" },
   { key:"yuuhi",  name:"ゆうひ",   emoji:"🌇", lamp:"#E88F70", user:"#6E4C48" },
-  { key:"hoshi",  name:"ほしぞら", emoji:"✨", lamp:"#E5D06E", user:"#5C5640" }
+  { key:"hoshi",  name:"ほしぞら", emoji:"✨", lamp:"#E5D06E", user:"#5C5640" },
+  { key:"custom", name:"じぶんいろ", emoji:"🎨", lamp:"#F2A65A", user:"#584E78" }
 ];
 function themeOf(key){ return THEMES.find(t => t.key === key) || THEMES[0]; }
 function hexSoft(hex){
   const n = parseInt(hex.slice(1), 16);
   return "rgba(" + ((n>>16)&255) + "," + ((n>>8)&255) + "," + (n&255) + ",.16)";
 }
-function applyTheme(key){
-  const t = themeOf(key);
-  const s = document.documentElement.style;
-  s.setProperty("--lamp", t.lamp);
-  s.setProperty("--lamp-soft", hexSoft(t.lamp));
-  s.setProperty("--user", t.user);
+/* その部屋の実際の2色を返すよ（じぶんいろにも対応） */
+function themeColorsFor(room){
+  if(room && room.theme === "custom"){
+    return {
+      lamp: room.customLamp || "#F2A65A",
+      user: room.customUser || "#584E78"
+    };
+  }
+  const t = themeOf(room ? room.theme : "lamp");
+  return { lamp: t.lamp, user: t.user };
 }
+function applyColors(c){
+  const s = document.documentElement.style;
+  s.setProperty("--lamp", c.lamp);
+  s.setProperty("--lamp-soft", hexSoft(c.lamp));
+  s.setProperty("--user", c.user);
+}
+function applyThemeFor(room){ applyColors(themeColorsFor(room)); }
 
 /* ---------- 記憶の棚データ ---------- */
 function loadShelf(roomId){ return load(shelfKey(roomId)) || { nextId: 1, items: [] }; }
@@ -1247,8 +1333,8 @@ function showScreen(name){
   $("albumScreen").classList.toggle("active", name === "album");
   $("searchScreen").classList.toggle("active", name === "search");
   /* 部屋の中ではその子のあかり、外ではランプ色に戻す */
-  if(name === "lobby" || name === "search") applyTheme("lamp");
-  else if(currentRoom && name !== "profile") applyTheme(currentRoom.theme);
+  if(name === "lobby" || name === "search") applyThemeFor(null);
+  else if(currentRoom && name !== "profile") applyThemeFor(currentRoom);
 }
 
 function renderLobby(){
@@ -1278,7 +1364,7 @@ function renderLobby(){
       '<span class="snippet">' + (lastMsg ? esc(lastMsg.content.slice(0,40)) : "まだ会話がないよ") + '</span>' +
       (r.modelName ? '<span class="rmodel">' + esc(r.modelName) + '</span>' : "");
     card.appendChild(face); card.appendChild(info);
-    card.style.borderLeft = "3px solid " + themeOf(r.theme).lamp;
+    card.style.borderLeft = "3px solid " + themeColorsFor(r).lamp;
     card.onclick = () => openRoom(r.id);
     list.appendChild(card);
   }
@@ -2422,25 +2508,40 @@ function exportAllMd(){
 
 /* ---------- プロフィール ---------- */
 let pendingTheme = "lamp";
+let pendingCustom = { lamp:"#F2A65A", user:"#584E78" };
+function previewTheme(){
+  applyColors(pendingTheme === "custom" ? pendingCustom : themeColorsFor({ theme: pendingTheme }));
+}
 function renderThemeSwatches(){
   const wrap = $("themeSwatches");
   wrap.innerHTML = "";
   for(const t of THEMES){
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "theme-swatch" + (t.key === pendingTheme ? " sel" : "");
-    b.style.background = t.lamp;
+    b.className = "theme-swatch" + (t.key === pendingTheme ? " sel" : "") + (t.key === "custom" ? " rainbow" : "");
+    if(t.key !== "custom") b.style.background = t.lamp;
     b.title = t.name;
     b.setAttribute("aria-label", "あかり：" + t.name);
     b.textContent = t.emoji;
     b.onclick = () => {
       pendingTheme = t.key;
-      applyTheme(t.key);   /* その場でプレビュー */
+      previewTheme();   /* その場でプレビュー */
       renderThemeSwatches();
     };
     wrap.appendChild(b);
   }
+  $("customColorRow").style.display = pendingTheme === "custom" ? "" : "none";
+  $("customLampInput").value = pendingCustom.lamp;
+  $("customUserInput").value = pendingCustom.user;
 }
+$("customLampInput").addEventListener("input", () => {
+  pendingCustom.lamp = $("customLampInput").value;
+  previewTheme();
+});
+$("customUserInput").addEventListener("input", () => {
+  pendingCustom.user = $("customUserInput").value;
+  previewTheme();
+});
 
 function openProfile(){
   if(!currentRoom) return;
@@ -2461,6 +2562,10 @@ function openProfile(){
     : null;
   pendingPhoto = undefined;
   pendingTheme = currentRoom.theme || "lamp";
+  pendingCustom = {
+    lamp: currentRoom.customLamp || "#F2A65A",
+    user: currentRoom.customUser || "#584E78"
+  };
   renderThemeSwatches();
   avatarInto($("profilePhoto"), currentRoom);
   showSelectedModel();
@@ -2480,22 +2585,99 @@ $("photoInput").addEventListener("change", () => {
   if(!file) return;
   const img = new Image();
   const url = URL.createObjectURL(file);
-  img.onload = () => {
-    const MAX = 512;
-    let w = img.width, h = img.height;
-    const scale = Math.min(1, MAX / Math.max(w, h));
-    w = Math.round(w * scale); h = Math.round(h * scale);
-    const cv = document.createElement("canvas");
-    cv.width = w; cv.height = h;
-    cv.getContext("2d").drawImage(img, 0, 0, w, h);
-    pendingPhoto = cv.toDataURL("image/jpeg", 0.85);
-    avatarInto($("profilePhoto"), currentRoom, pendingPhoto);
-    URL.revokeObjectURL(url);
-    $("photoInput").value = "";
-  };
+  img.onload = () => { openCrop(img, url); $("photoInput").value = ""; };
   img.onerror = () => { URL.revokeObjectURL(url); alert("この画像は読み込めなかったみたい…別の画像で試してみて。"); };
   img.src = url;
 });
+
+/* ---------- 顔写真のうつり調整（クロップ） ----------
+   Xのアイコンみたいに、ドラッグで位置・スライダーで大きさを決めるよ。
+   crop = { img, url, scale(表示px/元px), minScale, x, y(画像左上のフレーム内位置) } */
+const CROP_F = 260;              /* フレームの大きさ(px) */
+let crop = null;
+
+function openCrop(img, url){
+  const minScale = CROP_F / Math.min(img.width, img.height);
+  crop = { img, url, minScale, scale: minScale, x: 0, y: 0 };
+  /* 最初はまんなかを見せる */
+  crop.x = (CROP_F - img.width  * minScale) / 2;
+  crop.y = (CROP_F - img.height * minScale) / 2;
+  const el = $("cropImg");
+  el.src = url;
+  $("cropZoom").value = 100;
+  cropRender();
+  $("cropModal").classList.add("show");
+}
+
+function cropClamp(){
+  const w = crop.img.width  * crop.scale;
+  const h = crop.img.height * crop.scale;
+  crop.x = Math.min(0, Math.max(CROP_F - w, crop.x));
+  crop.y = Math.min(0, Math.max(CROP_F - h, crop.y));
+}
+
+function cropRender(){
+  cropClamp();
+  const el = $("cropImg");
+  el.style.width = (crop.img.width * crop.scale) + "px";
+  el.style.left = crop.x + "px";
+  el.style.top  = crop.y + "px";
+}
+
+/* ドラッグで見せたい場所へ */
+(() => {
+  const frame = $("cropFrame");
+  let drag = null;
+  frame.addEventListener("pointerdown", e => {
+    if(!crop) return;
+    drag = { px: e.clientX, py: e.clientY, x: crop.x, y: crop.y };
+    frame.classList.add("dragging");
+    frame.setPointerCapture(e.pointerId);
+  });
+  frame.addEventListener("pointermove", e => {
+    if(!drag || !crop) return;
+    crop.x = drag.x + (e.clientX - drag.px);
+    crop.y = drag.y + (e.clientY - drag.py);
+    cropRender();
+  });
+  const up = e => { drag = null; frame.classList.remove("dragging"); };
+  frame.addEventListener("pointerup", up);
+  frame.addEventListener("pointercancel", up);
+})();
+
+/* スライダーで大きさを（拡大は真ん中を保ったまま） */
+$("cropZoom").addEventListener("input", () => {
+  if(!crop) return;
+  const ns = crop.minScale * (Number($("cropZoom").value) / 100);
+  const cx = (CROP_F / 2 - crop.x) / crop.scale;  /* フレーム中心が見ている画像上の点 */
+  const cy = (CROP_F / 2 - crop.y) / crop.scale;
+  crop.scale = ns;
+  crop.x = CROP_F / 2 - cx * ns;
+  crop.y = CROP_F / 2 - cy * ns;
+  cropRender();
+});
+
+function closeCrop(){
+  if(crop){ URL.revokeObjectURL(crop.url); }
+  crop = null;
+  $("cropImg").src = "";
+  $("cropModal").classList.remove("show");
+}
+
+$("cropCancelBtn").onclick = closeCrop;
+$("cropOkBtn").onclick = () => {
+  if(!crop) return;
+  const OUT = 512;
+  const cv = document.createElement("canvas");
+  cv.width = OUT; cv.height = OUT;
+  const sx = -crop.x / crop.scale;
+  const sy = -crop.y / crop.scale;
+  const sw = CROP_F / crop.scale;
+  cv.getContext("2d").drawImage(crop.img, sx, sy, sw, sw, 0, 0, OUT, OUT);
+  pendingPhoto = cv.toDataURL("image/jpeg", 0.85);
+  avatarInto($("profilePhoto"), currentRoom, pendingPhoto);
+  closeCrop();
+};
 
 $("saveProfileBtn").onclick = () => {
   if(!currentRoom) return;
@@ -2511,6 +2693,8 @@ $("saveProfileBtn").onclick = () => {
   currentRoom.ayumiEnabled = $("ayumiEnabled").checked;
   currentRoom.reasoningEnabled = $("reasoningEnabled").checked;
   currentRoom.theme = pendingTheme;
+  currentRoom.customLamp = pendingCustom.lamp;
+  currentRoom.customUser = pendingCustom.user;
   if(pendingModel){ currentRoom.model = pendingModel.id; currentRoom.modelName = pendingModel.name; }
   save(LS_ROOMS, rooms);
 
