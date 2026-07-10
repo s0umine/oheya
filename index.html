@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>おへや v0.12</title>
+<title>おへや v0.13</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -694,6 +694,53 @@
   .crop-actions{display:flex;gap:10px}
   .crop-actions .btn{flex:1}
 
+  /* ---------- 会話のとびら（スレッド） ---------- */
+  #threadBar{
+    display:flex;align-items:center;gap:6px;justify-content:center;
+    background:var(--surface);border:none;border-bottom:1px solid var(--line);
+    color:var(--muted);font-family:var(--font-display);
+    font-size:12.5px;padding:7px 12px;cursor:pointer;
+    width:100%;transition:background .15s;
+  }
+  #threadBar:hover{background:var(--surface2);color:var(--text)}
+  #threadBar:focus-visible{outline:2px solid var(--lamp);outline-offset:-2px}
+  #threadBar #threadName{
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%;
+  }
+  #threadBar .tchev{font-size:10px;opacity:.7}
+  .thread-item{
+    display:flex;flex-direction:column;gap:3px;text-align:left;
+    background:var(--surface2);border:1px solid var(--line);
+    border-radius:12px;padding:11px 13px;margin-bottom:10px;
+    color:var(--text);font-family:var(--font-body);cursor:pointer;
+    width:100%;transition:background .15s;
+  }
+  .thread-item:hover{background:var(--bg)}
+  .thread-item:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+  .thread-item.cur{border-color:var(--lamp);box-shadow:0 0 0 1px var(--lamp)}
+  .thread-item .ttitle{
+    font-family:var(--font-display);font-weight:700;font-size:14px;
+    display:flex;align-items:center;gap:6px;
+  }
+  .thread-item .ttitle .now{
+    font-size:10px;color:var(--lamp);border:1px solid var(--lamp);
+    border-radius:99px;padding:1px 8px;font-weight:400;flex-shrink:0;
+  }
+  .thread-item .tsnip{
+    font-size:12.5px;color:var(--muted);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .thread-item .tfoot{
+    display:flex;align-items:center;gap:10px;font-size:11px;color:var(--muted);
+  }
+  .thread-item .tfoot .spacer{flex:1}
+  .thread-item .tact{
+    background:none;border:none;cursor:pointer;font-size:13px;
+    opacity:.55;padding:2px 4px;
+  }
+  .thread-item .tact:hover{opacity:1}
+  .thread-item .tact:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+
 </style>
 </head>
 <body>
@@ -729,10 +776,13 @@
     <button class="menu-item" id="diaryBtn">📔 日記帳</button>
     <button class="menu-item" id="ayumiBtn">📜 あゆみ帳</button>
     <button class="menu-item" id="albumBtn">📖 アルバム帳</button>
-    <button class="menu-item" id="exportBtn">📄 会話をMarkdownで保存</button>
-    <button class="menu-item" id="newBtn">🧹 新しい会話</button>
+    <button class="menu-item" id="exportBtn">📄 この会話をMarkdownで保存</button>
+    <button class="menu-item" id="newBtn">🧵 新しい会話をはじめる</button>
     <button class="menu-item" id="profileBtn">👤 プロフィール</button>
   </div>
+  <button id="threadBar" title="会話のとびら（この部屋の会話いちらん）">
+    🧵 <span id="threadName"></span><span class="tchev">▾</span>
+  </button>
   <main id="chat" aria-live="polite"></main>
   <footer>
     <div id="attachChip" hidden>
@@ -975,7 +1025,20 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.12 ─ じぶんいろと、おすましショット。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.13 ─ 会話のとびら、いくつでも。</p>
+  </div>
+</aside>
+
+<!-- ========== 会話のとびら（スレッド一覧） ========== -->
+<aside class="panel" id="threadPanel" aria-label="会話のとびら">
+  <div class="panel-head">
+    <h2>🧵 会話のとびら</h2>
+    <button class="iconbtn" data-close aria-label="閉じる">✕</button>
+  </div>
+  <div class="panel-body">
+    <button class="btn primary" id="threadNewBtn" style="width:100%">＋ 新しい会話をはじめる</button>
+    <div id="threadList" style="margin-top:14px"></div>
+    <p class="hint" style="margin-top:14px">この部屋の会話のとびら。話題ごとに分けても、記憶の棚や日記帳はこの子のものだから、どのとびらの中でもちゃんと覚えているよ。</p>
   </div>
 </aside>
 
@@ -1003,6 +1066,7 @@
 const LS_GLOBAL = "oheya_global_v2";
 const LS_ROOMS  = "oheya_rooms_v2";
 const chatKey   = id => "oheya_chat_v2_" + id;
+const threadKey = (roomId, threadId) => "oheya_chat_v3_" + roomId + "_" + threadId;
 const avatarKey = id => "oheya_avatar_v2_" + id;
 const shelfKey  = id => "oheya_shelf_v2_" + id;
 const diaryKey  = id => "oheya_diary_v2_" + id;
@@ -1029,6 +1093,67 @@ for(const r of rooms){
   if(r.theme === undefined) r.theme = "lamp";
 }
 save(LS_ROOMS, rooms);
+
+/* ---------- 会話のとびら（スレッド） ----------
+   v0.13から、1つの部屋にいくつも会話を置けるよ。
+   thread = { id, title, createdAt, updatedAt, auto(タイトル自動更新するか) } */
+function threadDateTitle(ts){
+  const d = new Date(ts || Date.now());
+  return (d.getMonth()+1) + "月" + d.getDate() + "日の会話";
+}
+/* 旧バージョン（部屋に会話1本）からのお引越し */
+for(const r of rooms){
+  if(!Array.isArray(r.threads)){
+    r.threads = [];
+    const old = load(chatKey(r.id));
+    if(Array.isArray(old) && old.length){
+      const first = old.find(m => m.ts);
+      const last  = [...old].reverse().find(m => m.ts);
+      const t = {
+        id: uid(), title: "これまでのお話",
+        createdAt: first ? first.ts : Date.now(),
+        updatedAt: last ? last.ts : Date.now(),
+        auto: false
+      };
+      save(threadKey(r.id, t.id), old);
+      r.threads.push(t);
+      r.activeThread = t.id;
+    }
+    del(chatKey(r.id));
+  }
+}
+save(LS_ROOMS, rooms);
+
+function newThread(room){
+  const t = { id: uid(), title: threadDateTitle(), createdAt: Date.now(), updatedAt: Date.now(), auto: true };
+  room.threads.push(t);
+  room.activeThread = t.id;
+  save(LS_ROOMS, rooms);
+  return t;
+}
+function latestThread(room){
+  if(!room.threads.length) return null;
+  return [...room.threads].sort((a,b) => (b.updatedAt||0) - (a.updatedAt||0))[0];
+}
+function delRoomChats(r){
+  del(chatKey(r.id));
+  for(const t of (r.threads || [])) del(threadKey(r.id, t.id));
+}
+/* いまの会話を保存して、スレッドの背表紙（更新日時・自動タイトル）も整えるよ */
+function saveChat(){
+  if(!currentRoom || !currentThread) return;
+  save(threadKey(currentRoom.id, currentThread.id), chat);
+  currentThread.updatedAt = Date.now();
+  if(currentThread.auto){
+    const firstUser = chat.find(m => m.role === "user" && typeof m.content === "string" && m.content.trim());
+    if(firstUser){
+      const s = firstUser.content.trim().replace(/\s+/g, " ");
+      currentThread.title = s.length > 18 ? s.slice(0, 18) + "…" : s;
+      currentThread.auto = false;
+    }
+  }
+  save(LS_ROOMS, rooms);
+}
 
 /* ---------- お部屋のあかり（テーマ） ---------- */
 const THEMES = [
@@ -1142,6 +1267,7 @@ async function imgDeleteRoom(roomId){
 /* ---------- 状態 ---------- */
 let currentRoom = null;
 let chat = [];
+let currentThread = null;
 let sending = false;
 let allModels = null;
 let pendingModel = null;
@@ -1350,7 +1476,8 @@ function renderLobby(){
     return;
   }
   for(const r of rooms){
-    const c = load(chatKey(r.id)) || [];
+    const lt = latestThread(r);
+    const c = lt ? (load(threadKey(r.id, lt.id)) || []) : [];
     const lastMsg = [...c].reverse().find(m => m.role === "user" || m.role === "assistant");
     const card = document.createElement("button");
     card.className = "room-card";
@@ -1370,11 +1497,20 @@ function renderLobby(){
   }
 }
 
-function openRoom(id){
+function openRoom(id, threadId){
   currentRoom = rooms.find(r => r.id === id);
   if(!currentRoom) return;
-  chat = load(chatKey(id)) || [];
+  if(!Array.isArray(currentRoom.threads)) currentRoom.threads = [];
+  let t = threadId ? currentRoom.threads.find(x => x.id === threadId) : null;
+  if(!t && currentRoom.activeThread) t = currentRoom.threads.find(x => x.id === currentRoom.activeThread);
+  if(!t) t = latestThread(currentRoom);
+  if(!t) t = newThread(currentRoom);
+  currentThread = t;
+  currentRoom.activeThread = t.id;
+  save(LS_ROOMS, rooms);
+  chat = load(threadKey(id, t.id)) || [];
   $("roomTitle").textContent = currentRoom.name;
+  $("threadName").textContent = t.title;
   avatarInto($("headerAvatar"), currentRoom);
   renderChat();
   showScreen("room");
@@ -1850,7 +1986,7 @@ async function sendText(text, apiOnlyExtra, image){
   const entry = { role:"user", content:text, ts:Date.now() };
   if(imgId){ entry.imgId = imgId; entry.imgName = image.name || ""; }
   chat.push(entry);
-  save(chatKey(currentRoom.id), chat);
+  saveChat();
   addBubble("user", text, null, imgId);
 
   const typing = document.createElement("div");
@@ -1921,7 +2057,7 @@ async function sendText(text, apiOnlyExtra, image){
         const entry = { role:"assistant", content:r.text, ts:Date.now() };
         if(r.reasoning) entry.reasoning = r.reasoning;
         chat.push(entry);
-        save(chatKey(currentRoom.id), chat);
+        saveChat();
       }
 
       if(!r.toolCalls.length){
@@ -1943,7 +2079,7 @@ async function sendText(text, apiOnlyExtra, image){
           if(typing.parentNode) typing.remove();
           addNote(note);
           chat.push({ role:"note", content: note, ts: Date.now() });
-          save(chatKey(currentRoom.id), chat);
+          saveChat();
         }
       }
       /* 次のラウンドへ（棚が変わったのでsystemも更新） */
@@ -2482,7 +2618,7 @@ function exportMd(){
   const d = new Date();
   const pad = n => String(n).padStart(2,"0");
   const stamp = d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
-  const lines = ["<!-- 日付: " + stamp + " -->", ""].concat(roomLogLines(currentRoom, chat));
+  const lines = ["<!-- 日付: " + stamp + " -->", "", "## 🧵 " + (currentThread ? currentThread.title : ""), ""].concat(roomLogLines(currentRoom, chat));
   downloadText(currentRoom.name + "_log_" + stamp + "_" + pad(d.getHours()) + pad(d.getMinutes()) + ".md", lines.join("\n"));
 }
 function exportAllMd(){
@@ -2493,13 +2629,18 @@ function exportAllMd(){
   let lines = ["# おへや 全部屋の会話ログ", "", "- 保存日: " + stamp, "- 部屋の数: " + rooms.length, ""];
   let count = 0;
   for(const r of rooms){
-    const c = load(chatKey(r.id)) || [];
     lines.push("", "---", "");
-    if(c.length === 0){
+    const threads = [...(r.threads || [])].sort((a,b) => (a.createdAt||0) - (b.createdAt||0));
+    const withChat = threads.map(t => ({ t, c: load(threadKey(r.id, t.id)) || [] })).filter(x => x.c.length);
+    if(withChat.length === 0){
       lines.push("# 会話ログ：" + r.name, "", "（まだ会話がないよ）", "");
       continue;
     }
-    lines = lines.concat(roomLogLines(r, c));
+    lines.push("# 会話ログ：" + r.name, "", "- モデル: " + (r.modelName || r.model || "未設定"), "", "- 会話の数: " + withChat.length, "");
+    for(const x of withChat){
+      lines.push("", "## 🧵 " + x.t.title, "");
+      lines = lines.concat(roomLogLines(r, x.c).slice(6)); /* 部屋見出しの重複は省いて本文だけ */
+    }
     count++;
   }
   downloadText("oheya_all_logs_" + stamp + "_" + pad(d.getHours()) + pad(d.getMinutes()) + ".md", lines.join("\n"));
@@ -2715,7 +2856,7 @@ $("saveProfileBtn").onclick = () => {
 $("deleteRoomBtn").onclick = () => {
   if(!currentRoom) return;
   if(confirm("「" + currentRoom.name + "」の部屋と会話履歴・写真・記憶の棚・日記帳・あゆみ帳・アルバム帳を消すよ。本当にいい?")){
-    del(chatKey(currentRoom.id));
+    delRoomChats(currentRoom);
     del(avatarKey(currentRoom.id));
     del(shelfKey(currentRoom.id));
     del(diaryKey(currentRoom.id));
@@ -2835,7 +2976,7 @@ $("toggleKey").onclick = () => {
 };
 $("wipeBtn").onclick = async () => {
   if(confirm("全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーを、この端末から全部消すよ。本当にいい?")){
-    for(const r of rooms){ del(chatKey(r.id)); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); }
+    for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); }
     del(LS_ROOMS); del(LS_GLOBAL);
     del("oheya_settings_v1"); del("oheya_chat_v1");
     try{ await albumClear(); }catch(e){}
@@ -2867,11 +3008,14 @@ $("exportAllBtn").onclick = exportAllMd;
 /* ---------- バックアップ ---------- */
 async function makeBackup(){
   const data = {
-    app: "oheya", version: 9, exportedAt: Date.now(),
+    app: "oheya", version: 10, exportedAt: Date.now(),
     rooms, chats: {}, shelves: {}, diaries: {}, ayumis: {}, avatars: {}, albums: [], chatimgs: []
   };
   for(const r of rooms){
-    data.chats[r.id] = load(chatKey(r.id)) || [];
+    data.chats[r.id] = {};
+    for(const t of (r.threads || [])){
+      data.chats[r.id][t.id] = load(threadKey(r.id, t.id)) || [];
+    }
     data.shelves[r.id] = loadShelf(r.id);
     data.diaries[r.id] = loadDiary(r.id);
     data.ayumis[r.id] = loadAyumi(r.id);
@@ -2919,18 +3063,26 @@ $("restoreInput").addEventListener("change", () => {
     const when = obj.exportedAt ? new Date(obj.exportedAt).toLocaleString("ja-JP") : "不明";
     if(!confirm("バックアップ（" + obj.rooms.length + "部屋・" + when + "保存）から復元するよ。\n今この端末にあるデータは置きかわるの。本当にいい?\n（心配なら先に💾で今の状態も保存してね）")) return;
     /* 今のデータを片付けてから復元 */
-    for(const r of rooms){ del(chatKey(r.id)); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); }
+    for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); }
     rooms = obj.rooms;
     save(LS_ROOMS, rooms);
     let photoTrouble = false;
     for(const r of rooms){
-      save(chatKey(r.id), (obj.chats && obj.chats[r.id]) || []);
+      const rc = obj.chats && obj.chats[r.id];
+      if(Array.isArray(rc)){
+        /* 旧形式（会話1本）は旧キーに置いておくと、次の起動でスレッドにお引越しされるよ */
+        delete r.threads; delete r.activeThread;
+        save(chatKey(r.id), rc);
+      }else if(rc && typeof rc === "object"){
+        for(const tid of Object.keys(rc)) save(threadKey(r.id, tid), rc[tid] || []);
+      }
       save(shelfKey(r.id), (obj.shelves && obj.shelves[r.id]) || { nextId:1, items:[] });
       save(diaryKey(r.id), (obj.diaries && obj.diaries[r.id]) || { nextId:1, items:[] });
       save(ayumiKey(r.id), (obj.ayumis && obj.ayumis[r.id]) || { nextId:1, items:[] });
       const av = obj.avatars && obj.avatars[r.id];
       if(av){ if(!saveRaw(avatarKey(r.id), av)) photoTrouble = true; }
     }
+    save(LS_ROOMS, rooms); /* 旧形式のthreads消しこみも保存に反映 */
     /* アルバムの復元（古いバックアップにはalbumsがないこともあるよ） */
     let albumTrouble = false;
     try{
@@ -2963,7 +3115,7 @@ $("addRoomBtn").onclick = () => {
     id: uid(), name: name.trim(), emoji: "🚪",
     model:"", modelName:"", sysPrompt:"",
     userName:"", userNote:"", memoryEnabled:true, diaryEnabled:true, ayumiEnabled:true, reasoningEnabled:false,
-    theme:"lamp",
+    theme:"lamp", threads:[],
     createdAt: Date.now()
   };
   rooms.push(r);
@@ -3023,12 +3175,14 @@ function runSearch(){
   const q = qRaw.toLowerCase();
   const hits = [];
   for(const r of rooms){
-    const c = load(chatKey(r.id)) || [];
-    for(let i = 0; i < c.length; i++){
-      const m = c[i];
-      if(m.role !== "user" && m.role !== "assistant") continue;
-      if(typeof m.content !== "string" || !m.content) continue;
-      if(m.content.toLowerCase().includes(q)) hits.push({ room: r, index: i, m });
+    for(const t of (r.threads || [])){
+      const c = load(threadKey(r.id, t.id)) || [];
+      for(let i = 0; i < c.length; i++){
+        const m = c[i];
+        if(m.role !== "user" && m.role !== "assistant") continue;
+        if(typeof m.content !== "string" || !m.content) continue;
+        if(m.content.toLowerCase().includes(q)) hits.push({ room: r, thread: t, index: i, m });
+      }
     }
   }
   hits.sort((a, b) => (b.m.ts || 0) - (a.m.ts || 0));
@@ -3053,17 +3207,17 @@ function runSearch(){
     const speaker = h.m.role === "assistant" ? h.room.name : (h.room.userName || "あなた");
     body.innerHTML =
       '<div class="who">' + esc(h.room.name) + 'の部屋 ─ ' + esc(speaker) +
-      ' <span class="when">' + fmtWhen(h.m.ts) + '</span></div>' +
+      ' <span class="when">🧵' + esc(h.thread.title) + ' ・ ' + fmtWhen(h.m.ts) + '</span></div>' +
       '<div class="snip">' + makeSnippet(h.m.content, q) + '</div>';
     btn.appendChild(av); btn.appendChild(body);
-    btn.onclick = () => openRoomAt(h.room.id, h.index);
+    btn.onclick = () => openRoomAt(h.room.id, h.thread.id, h.index);
     list.appendChild(btn);
   }
 }
 
 /* 検索結果から、その部屋のそのメッセージへ飛ぶよ */
-function openRoomAt(roomId, ci){
-  openRoom(roomId);
+function openRoomAt(roomId, threadId, ci){
+  openRoom(roomId, threadId);
   const jump = () => {
     const el = chatEl.querySelector('[data-ci="' + ci + '"]');
     if(!el) return;
@@ -3110,12 +3264,107 @@ inputEl.addEventListener("keydown", e => {
 inputEl.addEventListener("input", autoGrow);
 $("exportBtn").onclick = exportMd;
 $("newBtn").onclick = () => {
-  if(chat.length === 0) return;
-  if(confirm("いまの会話を消して新しくはじめる?（残したい場合は先に 📄 で保存してね。記憶の棚と日記帳はそのまま残るよ）")){
-    for(const m of chat){ if(m.imgId) imgRemove(m.imgId).catch(()=>{}); }
-    chat = []; save(chatKey(currentRoom.id), chat); renderChat();
-  }
+  if(!currentRoom) return;
+  startNewThread();
 };
+
+/* ---------- 会話のとびら（スレッド）UI ---------- */
+function startNewThread(){
+  /* いまの会話は消さずに残して、新しいとびらを開くよ */
+  if(sending){ alert("お返事を待ってから、新しいとびらを開こうね。"); return; }
+  if(chat.length === 0 && currentThread && currentThread.auto) { closePanels(); return; } /* まっさらなら今のままで */
+  const t = newThread(currentRoom);
+  currentThread = t;
+  chat = [];
+  $("threadName").textContent = t.title;
+  renderChat();
+  closePanels();
+}
+
+function switchThread(threadId){
+  if(sending){ alert("お返事を待ってから、とびらを移ろうね。"); return; }
+  saveChat();
+  openRoom(currentRoom.id, threadId);
+  closePanels();
+}
+
+function fmtWhenTime(ts){
+  if(!ts) return "";
+  const d = new Date(ts);
+  return (d.getMonth()+1) + "/" + d.getDate();
+}
+
+function renderThreadPanel(){
+  const list = $("threadList");
+  list.innerHTML = "";
+  const threads = [...currentRoom.threads].sort((a,b) => (b.updatedAt||0) - (a.updatedAt||0));
+  for(const t of threads){
+    const c = (t.id === currentThread.id) ? chat : (load(threadKey(currentRoom.id, t.id)) || []);
+    const lastMsg = [...c].reverse().find(m => m.role === "user" || m.role === "assistant");
+    const item = document.createElement("div");
+    item.className = "thread-item" + (t.id === currentThread.id ? " cur" : "");
+    item.setAttribute("role", "button");
+    item.tabIndex = 0;
+
+    const title = document.createElement("div");
+    title.className = "ttitle";
+    title.textContent = t.title;
+    if(t.id === currentThread.id){
+      const now = document.createElement("span");
+      now.className = "now"; now.textContent = "いまここ";
+      title.appendChild(now);
+    }
+    const snip = document.createElement("div");
+    snip.className = "tsnip";
+    snip.textContent = lastMsg ? lastMsg.content.slice(0, 42) : "まだ会話がないよ";
+
+    const foot = document.createElement("div");
+    foot.className = "tfoot";
+    const msgCount = c.filter(m => m.role === "user" || m.role === "assistant").length;
+    foot.innerHTML = '<span>' + fmtWhenTime(t.updatedAt) + '</span><span>' + msgCount + '通</span><span class="spacer"></span>';
+    const ren = document.createElement("button");
+    ren.className = "tact"; ren.textContent = "✏️"; ren.title = "なまえを変える";
+    ren.setAttribute("aria-label", "この会話のなまえを変える");
+    ren.onclick = e => {
+      e.stopPropagation();
+      const name = prompt("この会話のなまえは?", t.title);
+      if(name && name.trim()){
+        t.title = name.trim(); t.auto = false;
+        save(LS_ROOMS, rooms);
+        if(t.id === currentThread.id) $("threadName").textContent = t.title;
+        renderThreadPanel();
+      }
+    };
+    const delBtn = document.createElement("button");
+    delBtn.className = "tact"; delBtn.textContent = "🗑"; delBtn.title = "この会話を消す";
+    delBtn.setAttribute("aria-label", "この会話を消す");
+    delBtn.onclick = e => {
+      e.stopPropagation();
+      if(!confirm("「" + t.title + "」の会話を消すよ。（記憶の棚・日記・あゆみ・アルバムは残るよ）本当にいい?")) return;
+      const cc = load(threadKey(currentRoom.id, t.id)) || (t.id === currentThread.id ? chat : []);
+      for(const m of cc){ if(m.imgId) imgRemove(m.imgId).catch(()=>{}); }
+      del(threadKey(currentRoom.id, t.id));
+      currentRoom.threads = currentRoom.threads.filter(x => x.id !== t.id);
+      save(LS_ROOMS, rooms);
+      if(t.id === currentThread.id){
+        const next = latestThread(currentRoom);
+        if(next){ openRoom(currentRoom.id, next.id); }
+        else{ const nt = newThread(currentRoom); currentThread = nt; chat = []; $("threadName").textContent = nt.title; renderChat(); }
+      }
+      renderThreadPanel();
+    };
+    foot.appendChild(ren); foot.appendChild(delBtn);
+
+    item.appendChild(title); item.appendChild(snip); item.appendChild(foot);
+    const go = () => { if(t.id !== currentThread.id) switchThread(t.id); else closePanels(); };
+    item.onclick = go;
+    item.onkeydown = e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); } };
+    list.appendChild(item);
+  }
+}
+
+$("threadBar").onclick = () => { renderThreadPanel(); openPanel($("threadPanel")); };
+$("threadNewBtn").onclick = startNewThread;
 
 /* ---------- 初期化 ---------- */
 renderLobby();
