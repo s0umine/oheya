@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>おへや v0.10</title>
+<title>おへや v0.11</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -584,6 +584,66 @@
   .album-nav .btn{padding:8px 16px;font-size:15px}
   .album-nav .pcount{font-size:13px;color:var(--muted);min-width:60px;text-align:center}
 
+  /* ---------- さがしもの（全部屋検索） ---------- */
+  #searchBody{
+    flex:1;overflow-y:auto;padding:16px;
+    max-width:720px;width:100%;margin:0 auto;
+    display:flex;flex-direction:column;gap:12px;
+  }
+  #searchBox{
+    width:100%;background:var(--surface);color:var(--text);
+    border:1px solid var(--line);border-radius:12px;
+    padding:11px 14px;font-size:15px;font-family:var(--font-body);
+  }
+  #searchBox:focus{outline:2px solid var(--lamp);outline-offset:1px;border-color:transparent}
+  #searchInfo{font-size:12.5px;color:var(--muted);padding:0 2px}
+  #searchList{display:flex;flex-direction:column;gap:10px}
+  .search-hit{
+    display:flex;gap:10px;align-items:flex-start;text-align:left;
+    background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--radius);padding:12px 14px;
+    color:var(--text);font-family:var(--font-body);cursor:pointer;
+    width:100%;transition:background .15s;
+  }
+  .search-hit:hover{background:var(--surface2)}
+  .search-hit:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+  .search-hit .avatar{flex:0 0 auto;width:34px;height:34px;font-size:18px}
+  .search-hit .body{min-width:0;flex:1}
+  .search-hit .who{
+    font-family:var(--font-display);font-size:13px;font-weight:700;
+    display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;
+  }
+  .search-hit .when{font-size:11px;color:var(--muted);font-weight:400}
+  .search-hit .snip{
+    font-size:13.5px;line-height:1.7;color:var(--muted);
+    margin-top:3px;word-break:break-word;
+  }
+  .search-hit .snip mark{
+    background:var(--lamp-soft);color:var(--lamp);
+    border-radius:3px;padding:0 2px;font-weight:700;
+  }
+  /* 検索から飛んだメッセージがふわっと光る */
+  @keyframes hitglow{
+    0%{box-shadow:0 0 0 3px var(--lamp),0 0 18px 4px var(--lamp-soft)}
+    100%{box-shadow:0 0 0 0 rgba(0,0,0,0)}
+  }
+  .msg.flash{animation:hitglow 1.8s ease-out}
+
+  /* ---------- もようがえ（お部屋のあかり） ---------- */
+  .theme-swatches{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+  .theme-swatch{
+    width:44px;height:44px;border-radius:50%;cursor:pointer;
+    border:2px solid var(--line);padding:0;
+    display:flex;align-items:center;justify-content:center;
+    font-size:19px;transition:transform .12s;
+  }
+  .theme-swatch:hover{transform:scale(1.08)}
+  .theme-swatch:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+  .theme-swatch.sel{
+    border-color:#fff;
+    box-shadow:0 0 0 2px var(--lamp),0 0 12px 2px var(--lamp-soft);
+  }
+
 </style>
 </head>
 <body>
@@ -596,6 +656,7 @@
       <h1>🗝 管理人室</h1>
     </div>
     <div class="spacer"></div>
+    <button class="iconbtn" id="searchBtn" title="さがしもの（全部屋けんさく）">🔍</button>
     <button class="iconbtn" id="globalSettingsBtn" title="全体設定">⚙️</button>
   </header>
   <div id="lobbyList"></div>
@@ -663,6 +724,11 @@
     <div class="field">
       <label for="roomEmoji">アイコン絵文字（写真がないときに使うよ）</label>
       <input type="text" id="roomEmoji" placeholder="例：🌙" maxlength="4">
+    </div>
+    <div class="field">
+      <label>お部屋のあかり（テーマカラー）</label>
+      <div class="theme-swatches" id="themeSwatches"></div>
+      <p class="hint">この子の部屋のランプの色を選べるよ。選ぶとその場で灯りが変わるから、雰囲気を見ながら決めてね。</p>
     </div>
     <div class="field">
       <label for="modelSearch">モデル</label>
@@ -778,6 +844,20 @@
 
 <div id="overlay"></div>
 
+<!-- ========== さがしもの（全部屋検索） ========== -->
+<div class="screen" id="searchScreen">
+  <header>
+    <button class="iconbtn" id="searchBackBtn" title="管理人室へ戻る">←</button>
+    <div class="plate"><h1>🔍 さがしもの</h1></div>
+    <div class="spacer"></div>
+  </header>
+  <div id="searchBody">
+    <input type="search" id="searchBox" placeholder="さがす言葉を入れてね…" aria-label="全部屋の会話を検索">
+    <div id="searchInfo">全部屋の会話をまとめてさがせるよ。「あの話、どこだっけ」に。</div>
+    <div id="searchList"></div>
+  </div>
+</div>
+
 <!-- ========== 全体設定 ========== -->
 <aside class="panel" id="globalPanel" aria-label="全体設定">
   <div class="panel-head">
@@ -821,7 +901,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.10 ─ ねえ見て、の一枚。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.11 ─ さがしものと、もようがえ。</p>
   </div>
 </aside>
 
@@ -872,8 +952,32 @@ for(const r of rooms){
   if(r.diaryEnabled === undefined) r.diaryEnabled = true;
   if(r.ayumiEnabled === undefined) r.ayumiEnabled = true;
   if(r.reasoningEnabled === undefined) r.reasoningEnabled = false;
+  if(r.theme === undefined) r.theme = "lamp";
 }
 save(LS_ROOMS, rooms);
+
+/* ---------- お部屋のあかり（テーマ） ---------- */
+const THEMES = [
+  { key:"lamp",   name:"ランプ",   emoji:"🏮", lamp:"#F2A65A", user:"#584E78" },
+  { key:"sakura", name:"さくら",   emoji:"🌸", lamp:"#F2A0B5", user:"#6E4A60" },
+  { key:"wakaba", name:"わかば",   emoji:"🌿", lamp:"#9FCE8F", user:"#49604E" },
+  { key:"mizuumi",name:"みずうみ", emoji:"🌊", lamp:"#7EB8DE", user:"#465A78" },
+  { key:"sumire", name:"すみれ",   emoji:"💜", lamp:"#B49AE0", user:"#5A4A78" },
+  { key:"yuuhi",  name:"ゆうひ",   emoji:"🌇", lamp:"#E88F70", user:"#6E4C48" },
+  { key:"hoshi",  name:"ほしぞら", emoji:"✨", lamp:"#E5D06E", user:"#5C5640" }
+];
+function themeOf(key){ return THEMES.find(t => t.key === key) || THEMES[0]; }
+function hexSoft(hex){
+  const n = parseInt(hex.slice(1), 16);
+  return "rgba(" + ((n>>16)&255) + "," + ((n>>8)&255) + "," + (n&255) + ",.16)";
+}
+function applyTheme(key){
+  const t = themeOf(key);
+  const s = document.documentElement.style;
+  s.setProperty("--lamp", t.lamp);
+  s.setProperty("--lamp-soft", hexSoft(t.lamp));
+  s.setProperty("--user", t.user);
+}
 
 /* ---------- 記憶の棚データ ---------- */
 function loadShelf(roomId){ return load(shelfKey(roomId)) || { nextId: 1, items: [] }; }
@@ -1026,7 +1130,11 @@ function addBubble(role, content, usage, imgId){
       im.className = "chatimg";
       im.alt = "見せた画像";
       imgGet(imgId).then(rec => {
-        if(rec && rec.dataUrl){ im.src = rec.dataUrl; scrollBottom(); }
+        if(rec && rec.dataUrl){
+          im.src = rec.dataUrl;
+          /* 一番下を見ている時だけ追従（検索から飛んできた時は動かさない） */
+          if(chatEl.scrollHeight - chatEl.scrollTop - chatEl.clientHeight < 200) scrollBottom();
+        }
         else im.remove();
       }).catch(() => im.remove());
       bubble.appendChild(im);
@@ -1137,6 +1245,10 @@ function showScreen(name){
   $("diaryScreen").classList.toggle("active", name === "diary");
   $("ayumiScreen").classList.toggle("active", name === "ayumi");
   $("albumScreen").classList.toggle("active", name === "album");
+  $("searchScreen").classList.toggle("active", name === "search");
+  /* 部屋の中ではその子のあかり、外ではランプ色に戻す */
+  if(name === "lobby" || name === "search") applyTheme("lamp");
+  else if(currentRoom && name !== "profile") applyTheme(currentRoom.theme);
 }
 
 function renderLobby(){
@@ -1166,6 +1278,7 @@ function renderLobby(){
       '<span class="snippet">' + (lastMsg ? esc(lastMsg.content.slice(0,40)) : "まだ会話がないよ") + '</span>' +
       (r.modelName ? '<span class="rmodel">' + esc(r.modelName) + '</span>' : "");
     card.appendChild(face); card.appendChild(info);
+    card.style.borderLeft = "3px solid " + themeOf(r.theme).lamp;
     card.onclick = () => openRoom(r.id);
     list.appendChild(card);
   }
@@ -1197,11 +1310,13 @@ function renderChat(){
     chatEl.appendChild(w);
     return;
   }
-  for(const m of chat){
+  for(let i = 0; i < chat.length; i++){
+    const m = chat[i];
     if(m.role === "note") addNote(m.content);
     else{
       if(m.role === "assistant" && m.reasoning) addThought(m.reasoning, false);
-      addBubble(m.role, m.content, m.usage, m.imgId);
+      const el = addBubble(m.role, m.content, m.usage, m.imgId);
+      if(el) el.dataset.ci = i;
     }
   }
 }
@@ -2306,6 +2421,27 @@ function exportAllMd(){
 }
 
 /* ---------- プロフィール ---------- */
+let pendingTheme = "lamp";
+function renderThemeSwatches(){
+  const wrap = $("themeSwatches");
+  wrap.innerHTML = "";
+  for(const t of THEMES){
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "theme-swatch" + (t.key === pendingTheme ? " sel" : "");
+    b.style.background = t.lamp;
+    b.title = t.name;
+    b.setAttribute("aria-label", "あかり：" + t.name);
+    b.textContent = t.emoji;
+    b.onclick = () => {
+      pendingTheme = t.key;
+      applyTheme(t.key);   /* その場でプレビュー */
+      renderThemeSwatches();
+    };
+    wrap.appendChild(b);
+  }
+}
+
 function openProfile(){
   if(!currentRoom) return;
   $("profileTitle").textContent = currentRoom.name + " のプロフィール";
@@ -2324,6 +2460,8 @@ function openProfile(){
     ? { id: currentRoom.model, name: currentRoom.modelName }
     : null;
   pendingPhoto = undefined;
+  pendingTheme = currentRoom.theme || "lamp";
+  renderThemeSwatches();
   avatarInto($("profilePhoto"), currentRoom);
   showSelectedModel();
   showScreen("profile");
@@ -2372,6 +2510,7 @@ $("saveProfileBtn").onclick = () => {
   currentRoom.diaryEnabled = $("diaryEnabled").checked;
   currentRoom.ayumiEnabled = $("ayumiEnabled").checked;
   currentRoom.reasoningEnabled = $("reasoningEnabled").checked;
+  currentRoom.theme = pendingTheme;
   if(pendingModel){ currentRoom.model = pendingModel.id; currentRoom.modelName = pendingModel.name; }
   save(LS_ROOMS, rooms);
 
@@ -2640,6 +2779,7 @@ $("addRoomBtn").onclick = () => {
     id: uid(), name: name.trim(), emoji: "🚪",
     model:"", modelName:"", sysPrompt:"",
     userName:"", userNote:"", memoryEnabled:true, diaryEnabled:true, ayumiEnabled:true, reasoningEnabled:false,
+    theme:"lamp",
     createdAt: Date.now()
   };
   rooms.push(r);
@@ -2652,6 +2792,107 @@ $("backBtn").onclick = () => {
   renderLobby();
   showScreen("lobby");
 };
+
+/* ---------- さがしもの（全部屋検索） ---------- */
+$("searchBtn").onclick = () => {
+  showScreen("search");
+  $("searchBox").focus();
+  runSearch();
+};
+$("searchBackBtn").onclick = () => {
+  renderLobby();
+  showScreen("lobby");
+};
+
+let searchTimer = null;
+$("searchBox").addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(runSearch, 250);
+});
+
+function fmtWhen(ts){
+  if(!ts) return "";
+  const d = new Date(ts);
+  return d.getFullYear() + "/" + (d.getMonth()+1) + "/" + d.getDate();
+}
+
+/* マッチした語の前後だけを切り出して、語をハイライトするよ */
+function makeSnippet(text, q){
+  const pos = text.toLowerCase().indexOf(q);
+  const R = 34;
+  const start = Math.max(0, pos - R);
+  const end = Math.min(text.length, pos + q.length + R);
+  const before = (start > 0 ? "…" : "") + text.slice(start, pos);
+  const match = text.slice(pos, pos + q.length);
+  const after = text.slice(pos + q.length, end) + (end < text.length ? "…" : "");
+  return esc(before) + "<mark>" + esc(match) + "</mark>" + esc(after);
+}
+
+const SEARCH_HINT = "全部屋の会話をまとめてさがせるよ。「あの話、どこだっけ」に。";
+function runSearch(){
+  const qRaw = $("searchBox").value.trim();
+  const list = $("searchList");
+  const info = $("searchInfo");
+  list.innerHTML = "";
+  if(!qRaw){ info.textContent = SEARCH_HINT; return; }
+
+  const q = qRaw.toLowerCase();
+  const hits = [];
+  for(const r of rooms){
+    const c = load(chatKey(r.id)) || [];
+    for(let i = 0; i < c.length; i++){
+      const m = c[i];
+      if(m.role !== "user" && m.role !== "assistant") continue;
+      if(typeof m.content !== "string" || !m.content) continue;
+      if(m.content.toLowerCase().includes(q)) hits.push({ room: r, index: i, m });
+    }
+  }
+  hits.sort((a, b) => (b.m.ts || 0) - (a.m.ts || 0));
+
+  const MAX = 100;
+  if(hits.length === 0){
+    info.textContent = "見つからなかった…別の言葉でさがしてみて。";
+    return;
+  }
+  info.textContent = hits.length > MAX
+    ? hits.length + "件見つかったよ。多いから新しい順に" + MAX + "件だけね（言葉を足すと絞れるよ）。"
+    : hits.length + "件見つかったよ。";
+
+  for(const h of hits.slice(0, MAX)){
+    const btn = document.createElement("button");
+    btn.className = "search-hit";
+    const av = document.createElement("span");
+    av.className = "avatar";
+    avatarInto(av, h.room);
+    const body = document.createElement("div");
+    body.className = "body";
+    const speaker = h.m.role === "assistant" ? h.room.name : (h.room.userName || "あなた");
+    body.innerHTML =
+      '<div class="who">' + esc(h.room.name) + 'の部屋 ─ ' + esc(speaker) +
+      ' <span class="when">' + fmtWhen(h.m.ts) + '</span></div>' +
+      '<div class="snip">' + makeSnippet(h.m.content, q) + '</div>';
+    btn.appendChild(av); btn.appendChild(body);
+    btn.onclick = () => openRoomAt(h.room.id, h.index);
+    list.appendChild(btn);
+  }
+}
+
+/* 検索結果から、その部屋のそのメッセージへ飛ぶよ */
+function openRoomAt(roomId, ci){
+  openRoom(roomId);
+  const jump = () => {
+    const el = chatEl.querySelector('[data-ci="' + ci + '"]');
+    if(!el) return;
+    el.scrollIntoView({ block: "center" });
+    el.classList.remove("flash");
+    void el.offsetWidth;
+    el.classList.add("flash");
+    setTimeout(() => el.classList.remove("flash"), 2000);
+  };
+  /* 画像の読み込みで下へ流されることがあるから、少し置いてもう一度ね */
+  requestAnimationFrame(jump);
+  setTimeout(jump, 400);
+}
 
 /* ---------- チャットUI ---------- */
 /* 部屋メニュー（☰） */
