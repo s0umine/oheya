@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>おへや v0.8</title>
+<title>おへや v0.8.1</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -40,8 +40,30 @@
     background:var(--bg);color:var(--text);
     height:100dvh;overscroll-behavior:none;
   }
-  .screen{display:none;flex-direction:column;height:100dvh}
+  .screen{display:none;flex-direction:column;height:100dvh;position:relative}
   .screen.active{display:flex}
+
+  /* ---------- 部屋メニュー（☰） ---------- */
+  .room-menu{
+    position:absolute;z-index:9;
+    top:calc(env(safe-area-inset-top) + 58px);right:10px;
+    background:var(--surface2);border:1px solid var(--line);
+    border-radius:12px;padding:6px;min-width:216px;
+    box-shadow:0 8px 24px rgba(0,0,0,.4);
+    display:none;flex-direction:column;
+    transform-origin:top right;
+  }
+  .room-menu.show{display:flex;animation:menuPop .14s ease}
+  @keyframes menuPop{from{transform:scale(.96);opacity:0}to{transform:none;opacity:1}}
+  @media(prefers-reduced-motion:reduce){.room-menu.show{animation:none}}
+  .menu-item{
+    background:none;border:none;color:var(--text);
+    text-align:left;padding:11px 14px;border-radius:8px;
+    font-size:14px;font-family:var(--font-body);cursor:pointer;
+  }
+  .menu-item:hover{background:var(--surface)}
+  .menu-item:focus-visible{outline:2px solid var(--lamp);outline-offset:-2px}
+  #roomMenuBtn[aria-expanded="true"]{background:var(--surface2);border-color:var(--lamp)}
 
   header{
     padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;
@@ -525,13 +547,16 @@
       <h1 id="roomTitle"></h1>
     </div>
     <div class="spacer"></div>
-    <button class="iconbtn" id="shelfBtn" title="記憶の棚">📚</button>
-    <button class="iconbtn" id="diaryBtn" title="日記帳">📔</button>
-    <button class="iconbtn" id="albumBtn" title="アルバム帳">📖</button>
-    <button class="iconbtn" id="exportBtn" title="会話をMarkdownで保存">📄</button>
-    <button class="iconbtn" id="newBtn" title="新しい会話">🧹</button>
-    <button class="iconbtn" id="profileBtn" title="プロフィール">👤</button>
+    <button class="iconbtn" id="roomMenuBtn" title="メニュー" aria-haspopup="true" aria-expanded="false">☰</button>
   </header>
+  <div class="room-menu" id="roomMenu">
+    <button class="menu-item" id="shelfBtn">📚 記憶の棚</button>
+    <button class="menu-item" id="diaryBtn">📔 日記帳</button>
+    <button class="menu-item" id="albumBtn">📖 アルバム帳</button>
+    <button class="menu-item" id="exportBtn">📄 会話をMarkdownで保存</button>
+    <button class="menu-item" id="newBtn">🧹 新しい会話</button>
+    <button class="menu-item" id="profileBtn">👤 プロフィール</button>
+  </div>
   <main id="chat" aria-live="polite"></main>
   <footer>
     <textarea id="input" rows="1" placeholder="メッセージを書く…" aria-label="メッセージ入力"></textarea>
@@ -699,7 +724,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.8 ─ アルバム帳と、保存領域のものさし。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.8.1 ─ アルバム帳と、すっきりメニュー。</p>
   </div>
 </aside>
 
@@ -967,6 +992,8 @@ function jpError(status, apiMsg){
 
 /* ---------- 画面 ---------- */
 function showScreen(name){
+  const menu = document.getElementById("roomMenu");
+  if(menu){ menu.classList.remove("show"); $("roomMenuBtn").setAttribute("aria-expanded","false"); }
   $("lobbyScreen").classList.toggle("active", name === "lobby");
   $("roomScreen").classList.toggle("active", name === "room");
   $("profileScreen").classList.toggle("active", name === "profile");
@@ -2197,6 +2224,26 @@ $("backBtn").onclick = () => {
 };
 
 /* ---------- チャットUI ---------- */
+/* 部屋メニュー（☰） */
+const roomMenu = $("roomMenu");
+function closeRoomMenu(){
+  roomMenu.classList.remove("show");
+  $("roomMenuBtn").setAttribute("aria-expanded", "false");
+}
+$("roomMenuBtn").onclick = e => {
+  e.stopPropagation();
+  const show = !roomMenu.classList.contains("show");
+  roomMenu.classList.toggle("show", show);
+  $("roomMenuBtn").setAttribute("aria-expanded", show ? "true" : "false");
+};
+/* メニューの項目を押したら閉じる（各ボタンのonclickが先に動くよ） */
+roomMenu.addEventListener("click", () => closeRoomMenu());
+document.addEventListener("click", e => {
+  if(!roomMenu.classList.contains("show")) return;
+  if(!roomMenu.contains(e.target) && e.target !== $("roomMenuBtn")) closeRoomMenu();
+});
+document.addEventListener("keydown", e => { if(e.key === "Escape") closeRoomMenu(); });
+
 function autoGrow(){
   inputEl.style.height = "auto";
   inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + "px";
