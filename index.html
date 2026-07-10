@@ -1,0 +1,1651 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>おへや v0.6</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#2B2735;
+    --surface:#353041;
+    --surface2:#403A52;
+    --line:#4A4460;
+    --paper:#F5EFE4;
+    --ink:#3A3243;
+    --text:#EBE6F2;
+    --muted:#A79FB8;
+    --lamp:#F2A65A;
+    --lamp-soft:rgba(242,166,90,.16);
+    --user:#584E78;
+    --danger:#E08585;
+    --radius:16px;
+    --font-display:"Zen Maru Gothic",sans-serif;
+    --font-body:"Zen Kaku Gothic New",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:var(--font-body);
+    background:var(--bg);color:var(--text);
+    height:100dvh;overscroll-behavior:none;
+  }
+  .screen{display:none;flex-direction:column;height:100dvh}
+  .screen.active{display:flex}
+
+  header{
+    padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;
+    display:flex;align-items:center;gap:10px;
+    background:linear-gradient(180deg,#332E40,var(--bg));
+    border-bottom:1px solid var(--line);
+    flex-shrink:0;
+  }
+  .plate{
+    display:flex;align-items:center;gap:10px;
+    background:var(--surface2);
+    border:1px solid var(--line);
+    border-radius:12px;padding:8px 14px;
+    box-shadow:0 2px 8px rgba(0,0,0,.25);
+    min-width:0;
+  }
+  .lampdot{
+    width:10px;height:10px;border-radius:50%;
+    background:#6B6480;flex-shrink:0;
+    transition:background .3s, box-shadow .3s;
+  }
+  .lampdot.on{
+    background:var(--lamp);
+    box-shadow:0 0 10px 2px var(--lamp-soft),0 0 4px var(--lamp);
+  }
+  .plate h1{
+    font-family:var(--font-display);
+    font-size:17px;font-weight:700;letter-spacing:.08em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .model-chip{
+    font-size:11px;color:var(--muted);
+    max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .spacer{flex:1}
+  .iconbtn{
+    background:var(--surface);border:1px solid var(--line);color:var(--text);
+    border-radius:10px;padding:8px 10px;font-size:15px;cursor:pointer;
+    font-family:var(--font-body);transition:background .15s;flex-shrink:0;
+  }
+  .iconbtn:hover{background:var(--surface2)}
+  .iconbtn:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+
+  .avatar{
+    border-radius:50%;overflow:hidden;flex-shrink:0;
+    background:var(--surface2);border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .avatar img{width:100%;height:100%;object-fit:cover;display:block}
+
+  /* ---------- 管理人室 ---------- */
+  #lobbyList{
+    flex:1;overflow-y:auto;
+    padding:18px 14px calc(env(safe-area-inset-bottom) + 90px);
+    display:flex;flex-direction:column;gap:12px;
+  }
+  .room-card{
+    display:flex;align-items:center;gap:14px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:14px;padding:14px 16px;
+    cursor:pointer;text-align:left;width:100%;
+    color:var(--text);font-family:var(--font-body);
+    transition:background .15s, transform .1s;
+  }
+  .room-card:hover{background:var(--surface2)}
+  .room-card:active{transform:scale(.99)}
+  .room-card:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+  .room-card .face{width:48px;height:48px;font-size:24px}
+  .room-card .info{flex:1;min-width:0}
+  .room-card .rname{
+    font-family:var(--font-display);font-size:15.5px;font-weight:700;
+    letter-spacing:.05em;margin-bottom:2px;
+  }
+  .room-card .snippet{
+    font-size:12.5px;color:var(--muted);display:block;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .room-card .rmodel{
+    font-size:10.5px;color:var(--muted);
+    border:1px solid var(--line);border-radius:99px;
+    padding:2px 8px;margin-top:4px;display:inline-block;
+    max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .lobby-empty{
+    text-align:center;color:var(--muted);font-size:13.5px;
+    line-height:2;margin-top:10vh;
+  }
+  .lobby-empty .door{font-size:36px;display:block;margin-bottom:8px}
+  #addRoomBtn{
+    position:fixed;right:18px;bottom:calc(env(safe-area-inset-bottom) + 18px);
+    background:var(--lamp);color:#3A2C18;border:none;
+    border-radius:99px;padding:14px 22px;
+    font-family:var(--font-display);font-size:15px;font-weight:700;
+    box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;z-index:5;
+  }
+  #addRoomBtn:hover{filter:brightness(1.08)}
+  #addRoomBtn:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+
+  /* ---------- チャット ---------- */
+  #chat{
+    flex:1;overflow-y:auto;
+    padding:18px 14px 10px;
+    display:flex;flex-direction:column;gap:14px;
+  }
+  .arow{display:flex;gap:8px;align-items:flex-end;max-width:92%;align-self:flex-start}
+  .arow .avatar{width:30px;height:30px;font-size:16px;margin-bottom:2px}
+  .msg{line-height:1.75;font-size:15px;white-space:pre-wrap;word-break:break-word;min-width:0}
+  .msg.assistant{
+    background:var(--paper);color:var(--ink);
+    border-radius:4px var(--radius) var(--radius) var(--radius);
+    padding:12px 15px;
+    box-shadow:0 2px 6px rgba(0,0,0,.2);
+  }
+  .msg.user{
+    align-self:flex-end;max-width:86%;
+    background:var(--user);color:var(--text);
+    border-radius:var(--radius) 4px var(--radius) var(--radius);
+    padding:12px 15px;
+  }
+  .msg.error{
+    align-self:center;background:transparent;color:var(--danger);
+    border:1px dashed var(--danger);border-radius:12px;
+    padding:10px 14px;font-size:13.5px;max-width:92%;
+  }
+  .note{
+    align-self:center;color:var(--muted);
+    font-size:12px;background:var(--surface);
+    border:1px solid var(--line);border-radius:99px;
+    padding:5px 14px;
+  }
+  .meta{
+    align-self:flex-start;font-size:11px;color:var(--muted);
+    margin-top:-8px;padding-left:42px;
+  }
+  .msg.assistant code{
+    background:rgba(58,50,67,.1);border-radius:4px;padding:1px 5px;
+    font-size:13px;font-family:ui-monospace,Menlo,Consolas,monospace;
+  }
+  .msg.assistant pre{
+    background:#2E2937;color:#EDE9F5;border-radius:10px;
+    padding:12px;overflow-x:auto;margin:8px 0;font-size:13px;line-height:1.6;
+  }
+  .msg.assistant pre code{background:none;padding:0;color:inherit}
+  .msg.assistant strong{font-weight:700}
+  .msg.assistant a{color:#7A5FA8}
+  .msg.assistant ul,.msg.assistant ol{padding-left:1.4em;margin:4px 0}
+  .msg.assistant h1,.msg.assistant h2,.msg.assistant h3{
+    font-family:var(--font-display);margin:8px 0 4px;font-size:1.05em;
+  }
+  .typing{color:var(--muted);font-size:13px;align-self:flex-start;padding-left:4px}
+  .typing::after{content:"…";animation:blink 1.2s infinite}
+  @keyframes blink{50%{opacity:.3}}
+  @media(prefers-reduced-motion:reduce){.typing::after{animation:none}}
+  .welcome{
+    align-self:center;text-align:center;color:var(--muted);
+    font-size:13.5px;line-height:2;margin-top:6vh;
+    display:flex;flex-direction:column;align-items:center;gap:10px;
+  }
+  .welcome .avatar{width:84px;height:84px;font-size:42px}
+
+  footer{
+    flex-shrink:0;
+    padding:10px 12px calc(env(safe-area-inset-bottom) + 10px);
+    background:linear-gradient(0deg,#332E40,var(--bg));
+    border-top:1px solid var(--line);
+    display:flex;gap:8px;align-items:flex-end;
+  }
+  #input{
+    flex:1;resize:none;
+    background:var(--surface);color:var(--text);
+    border:1px solid var(--line);border-radius:14px;
+    padding:11px 14px;font-size:15px;line-height:1.6;
+    font-family:var(--font-body);
+    max-height:140px;min-height:44px;
+  }
+  #input:focus{outline:2px solid var(--lamp);outline-offset:1px;border-color:transparent}
+  #send{
+    background:var(--lamp);color:#3A2C18;border:none;
+    border-radius:14px;padding:0 18px;height:44px;
+    font-size:15px;font-weight:700;cursor:pointer;
+    font-family:var(--font-display);transition:filter .15s;
+  }
+  #send:hover{filter:brightness(1.08)}
+  #send:disabled{filter:grayscale(.6);opacity:.5;cursor:default}
+  #send:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+
+  /* ---------- プロフィール ---------- */
+  #profileBody{
+    flex:1;overflow-y:auto;
+    padding:24px 18px calc(env(safe-area-inset-bottom) + 32px);
+    max-width:560px;width:100%;margin:0 auto;
+  }
+  .photo-wrap{
+    display:flex;flex-direction:column;align-items:center;gap:10px;
+    margin-bottom:26px;
+  }
+  #profilePhoto{
+    width:132px;height:132px;font-size:56px;cursor:pointer;
+    border:2px solid var(--line);
+    box-shadow:0 4px 16px rgba(0,0,0,.3);
+    transition:border-color .2s;
+  }
+  #profilePhoto:hover{border-color:var(--lamp)}
+  #profilePhoto:focus-visible{outline:2px solid var(--lamp);outline-offset:3px}
+  .photo-actions{display:flex;gap:8px}
+  .photo-actions .btn{font-size:12.5px;padding:7px 12px}
+  .section-title{
+    font-family:var(--font-display);font-size:13.5px;
+    color:var(--lamp);letter-spacing:.1em;
+    margin:26px 0 12px;padding-bottom:6px;
+    border-bottom:1px solid var(--line);
+  }
+  .field{margin-bottom:20px}
+  .field label{
+    display:block;font-size:12.5px;color:var(--muted);
+    margin-bottom:6px;letter-spacing:.04em;
+  }
+  .field input[type=text],.field input[type=password],.field textarea{
+    width:100%;background:var(--surface);color:var(--text);
+    border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;font-size:14px;font-family:var(--font-body);
+  }
+  .field textarea{resize:vertical;min-height:100px;line-height:1.7}
+  .field input:focus,.field textarea:focus{outline:2px solid var(--lamp);outline-offset:1px}
+  .check{display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer}
+  .check input{width:18px;height:18px;accent-color:var(--lamp)}
+  .row{display:flex;gap:8px}
+  .row>*{flex:1}
+  .btn{
+    background:var(--surface2);color:var(--text);
+    border:1px solid var(--line);border-radius:10px;
+    padding:10px 14px;font-size:13.5px;cursor:pointer;
+    font-family:var(--font-body);
+  }
+  .btn:hover{background:#494263}
+  .btn:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+  .btn.primary{background:var(--lamp);color:#3A2C18;border:none;font-weight:700;font-family:var(--font-display)}
+  .btn.danger{color:var(--danger);border-color:var(--danger)}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.7}
+  .savebar{
+    position:sticky;bottom:0;padding:12px 0 4px;
+    background:linear-gradient(0deg,var(--bg) 70%,transparent);
+  }
+
+  /* ---------- パネル ---------- */
+  #overlay{
+    position:fixed;inset:0;background:rgba(20,17,28,.55);
+    opacity:0;pointer-events:none;transition:opacity .2s;z-index:10;
+  }
+  #overlay.show{opacity:1;pointer-events:auto}
+  .panel{
+    position:fixed;top:0;right:0;bottom:0;z-index:11;
+    width:min(440px,100%);
+    background:var(--surface);
+    border-left:1px solid var(--line);
+    transform:translateX(100%);transition:transform .25s ease;
+    display:flex;flex-direction:column;
+  }
+  @media(prefers-reduced-motion:reduce){.panel{transition:none}#overlay{transition:none}}
+  .panel.show{transform:translateX(0)}
+  .panel-head{
+    padding:calc(env(safe-area-inset-top) + 14px) 18px 12px;
+    display:flex;align-items:center;justify-content:space-between;
+    border-bottom:1px solid var(--line);
+  }
+  .panel-head h2{font-family:var(--font-display);font-size:16px;letter-spacing:.06em}
+  .panel-body{flex:1;overflow-y:auto;padding:16px 18px calc(env(safe-area-inset-bottom) + 24px)}
+  .panel .field input{background:var(--bg)}
+  .credits{
+    font-size:13.5px;background:var(--bg);border:1px solid var(--line);
+    border-radius:10px;padding:10px 12px;margin-top:8px;line-height:1.8;
+  }
+  .credits b{color:var(--lamp)}
+  #modelList{
+    margin-top:8px;max-height:220px;overflow-y:auto;
+    border:1px solid var(--line);border-radius:10px;
+    background:var(--surface);display:none;
+  }
+  #modelList.show{display:block}
+  .model-item{
+    padding:9px 12px;font-size:13px;cursor:pointer;
+    border-bottom:1px solid var(--line);line-height:1.5;
+  }
+  .model-item:last-child{border-bottom:none}
+  .model-item:hover{background:var(--surface2)}
+  .model-item .mid{color:var(--muted);font-size:11.5px;display:block}
+  .selected-model{
+    margin-top:8px;font-size:13px;
+    background:var(--lamp-soft);border:1px solid var(--lamp);
+    border-radius:10px;padding:8px 12px;display:none;
+  }
+  .selected-model.show{display:block}
+
+  /* ---------- 記憶の棚 ---------- */
+  .shelf-item{
+    background:var(--bg);border:1px solid var(--line);
+    border-radius:12px;padding:12px 14px;margin-bottom:12px;
+  }
+  .shelf-item .sid{
+    font-size:11px;color:var(--lamp);
+    font-family:var(--font-display);letter-spacing:.05em;
+    display:flex;align-items:center;gap:8px;margin-bottom:6px;
+  }
+  .shelf-item .sid .sdate{color:var(--muted);font-family:var(--font-body)}
+  .shelf-item .scontent{font-size:14px;line-height:1.8;white-space:pre-wrap;word-break:break-word}
+  .shelf-item textarea{
+    width:100%;background:var(--surface);color:var(--text);
+    border:1px solid var(--line);border-radius:8px;
+    padding:8px 10px;font-size:13.5px;line-height:1.7;
+    font-family:var(--font-body);resize:vertical;min-height:70px;
+  }
+  .shelf-item .sactions{display:flex;gap:6px;margin-top:8px;justify-content:flex-end}
+  .shelf-item .sactions .btn{padding:5px 10px;font-size:12px}
+  .shelf-empty{
+    text-align:center;color:var(--muted);font-size:13px;
+    line-height:2;padding:30px 0;
+  }
+
+  /* ---------- 日記帳 ---------- */
+  #diaryBody{
+    flex:1;overflow-y:auto;
+    padding:18px 16px calc(env(safe-area-inset-bottom) + 24px);
+    width:100%;max-width:640px;margin:0 auto;
+  }
+  .diary-entry{
+    background:var(--paper);color:var(--ink);
+    border-radius:4px 14px 14px 4px;
+    border-left:4px solid var(--lamp);
+    padding:16px 18px 14px;margin-bottom:16px;
+    box-shadow:0 3px 10px rgba(0,0,0,.3);
+    position:relative;
+  }
+  .diary-entry .ddate{
+    font-size:11.5px;color:#8A7F94;
+    font-family:var(--font-display);letter-spacing:.08em;
+    margin-bottom:4px;
+  }
+  .diary-entry .dtitle{
+    font-family:var(--font-display);font-weight:700;
+    font-size:15.5px;margin-bottom:8px;padding-right:34px;
+  }
+  .diary-entry .dtext{
+    font-size:14px;line-height:1.9;
+    white-space:pre-wrap;word-break:break-word;
+  }
+  .diary-entry .ddel{
+    position:absolute;top:10px;right:10px;
+    background:none;border:none;cursor:pointer;
+    font-size:14px;opacity:.45;padding:4px;
+  }
+  .diary-entry .ddel:hover{opacity:1}
+  .diary-entry .ddel:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+  .diary-empty{
+    text-align:center;color:var(--muted);font-size:13px;
+    line-height:2;padding:44px 0;
+  }
+  .diary-empty .book{font-size:36px;display:block;margin-bottom:8px}
+  #diaryAskBtn{width:100%;margin-top:4px}
+</style>
+</head>
+<body>
+
+<!-- ========== 管理人室 ========== -->
+<div class="screen active" id="lobbyScreen">
+  <header>
+    <div class="plate">
+      <span class="lampdot" id="lamp" aria-hidden="true"></span>
+      <h1>🗝 管理人室</h1>
+    </div>
+    <div class="spacer"></div>
+    <button class="iconbtn" id="globalSettingsBtn" title="全体設定">⚙️</button>
+  </header>
+  <div id="lobbyList"></div>
+  <button id="addRoomBtn">＋ 新しい部屋</button>
+</div>
+
+<!-- ========== 各部屋 ========== -->
+<div class="screen" id="roomScreen">
+  <header>
+    <button class="iconbtn" id="backBtn" title="管理人室へ戻る">←</button>
+    <div class="plate">
+      <span class="avatar" id="headerAvatar" style="width:26px;height:26px;font-size:15px" aria-hidden="true"></span>
+      <h1 id="roomTitle"></h1>
+    </div>
+    <div class="spacer"></div>
+    <button class="iconbtn" id="shelfBtn" title="記憶の棚">📚</button>
+    <button class="iconbtn" id="diaryBtn" title="日記帳">📔</button>
+    <button class="iconbtn" id="exportBtn" title="会話をMarkdownで保存">📄</button>
+    <button class="iconbtn" id="newBtn" title="新しい会話">🧹</button>
+    <button class="iconbtn" id="profileBtn" title="プロフィール">👤</button>
+  </header>
+  <main id="chat" aria-live="polite"></main>
+  <footer>
+    <textarea id="input" rows="1" placeholder="メッセージを書く…" aria-label="メッセージ入力"></textarea>
+    <button id="send">送る</button>
+  </footer>
+</div>
+
+<!-- ========== プロフィール ========== -->
+<div class="screen" id="profileScreen">
+  <header>
+    <button class="iconbtn" id="profileBackBtn" title="部屋へ戻る">←</button>
+    <div class="plate"><h1 id="profileTitle">プロフィール</h1></div>
+    <div class="spacer"></div>
+  </header>
+  <div id="profileBody">
+    <div class="photo-wrap">
+      <button class="avatar" id="profilePhoto" title="写真を変える" aria-label="顔写真を変更"></button>
+      <div class="photo-actions">
+        <button class="btn" id="photoPickBtn">📷 写真をえらぶ</button>
+        <button class="btn" id="photoRemoveBtn">はずす</button>
+      </div>
+      <input type="file" id="photoInput" accept="image/*" hidden>
+    </div>
+
+    <div class="section-title">この子のこと</div>
+    <div class="field">
+      <label for="roomName">なまえ</label>
+      <input type="text" id="roomName" placeholder="例：ソラ">
+    </div>
+    <div class="field">
+      <label for="roomEmoji">アイコン絵文字（写真がないときに使うよ）</label>
+      <input type="text" id="roomEmoji" placeholder="例：🌙" maxlength="4">
+    </div>
+    <div class="field">
+      <label for="modelSearch">モデル</label>
+      <input type="text" id="modelSearch" placeholder="検索：claude / gpt / gemini …">
+      <div id="modelList"></div>
+      <div class="selected-model" id="selectedModel"></div>
+      <p class="hint">検索して選ぶか、モデルIDを直接貼ってもOK。</p>
+    </div>
+    <div class="field">
+      <label for="sysPrompt">この子のプロンプト（性格・口調・設定）</label>
+      <textarea id="sysPrompt" placeholder="例：あなたの名前はソラ。おだやかで詩的な話し方をする。"></textarea>
+    </div>
+    <div class="field">
+      <label class="check">
+        <input type="checkbox" id="memoryEnabled">
+        📚 記憶の棚を使う（この子が自分でメモを書けるようになるよ）
+      </label>
+      <p class="hint">モデルがツール機能に対応している必要があるよ。対応してないモデルでエラーが出たら、ここをオフにしてね。</p>
+    </div>
+    <div class="field">
+      <label class="check">
+        <input type="checkbox" id="diaryEnabled">
+        📔 日記帳を使う（この子が自分で日記を書いて、読み返せるようになるよ）
+      </label>
+      <p class="hint">こちらもツール機能を使うよ。ふだんの会話には最近の日記だけ渡すから、通信量にもやさしいの。</p>
+    </div>
+
+    <div class="section-title">わたしのこと（この子にだけ伝わるよ）</div>
+    <div class="field">
+      <label for="userName">この子からの呼ばれたい名前</label>
+      <input type="text" id="userName" placeholder="例：リサ / お姉ちゃん / 先生">
+    </div>
+    <div class="field">
+      <label for="userNote">この子に知っておいてほしいこと</label>
+      <textarea id="userNote" placeholder="例：夜型の生活をしてる。甘いものが好き。"></textarea>
+    </div>
+
+    <div class="savebar">
+      <button class="btn primary" id="saveProfileBtn" style="width:100%">プロフィールを保存</button>
+    </div>
+
+    <div class="field" style="margin-top:30px">
+      <button class="btn danger" id="deleteRoomBtn" style="width:100%">部屋をとりこわす</button>
+      <p class="hint">この部屋と会話履歴・写真・記憶の棚を消すよ。大事な会話は先に 📄 で保存してね。</p>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 日記帳 ========== -->
+<div class="screen" id="diaryScreen">
+  <header>
+    <button class="iconbtn" id="diaryBackBtn" title="部屋へ戻る">←</button>
+    <div class="plate"><h1 id="diaryTitle">📔 日記帳</h1></div>
+    <div class="spacer"></div>
+  </header>
+  <div id="diaryBody">
+    <div id="diaryList"></div>
+    <button class="btn" id="diaryAskBtn">📔 今日の日記をお願いする</button>
+    <p class="hint" style="margin-top:10px">日記はこの子が自分で書く帳面だよ。ふだんの会話には最近の日記だけ持っていって、思い出したくなったら自分で昔のページをめくるの。</p>
+  </div>
+</div>
+
+<div id="overlay"></div>
+
+<!-- ========== 全体設定 ========== -->
+<aside class="panel" id="globalPanel" aria-label="全体設定">
+  <div class="panel-head">
+    <h2>🗝 全体設定</h2>
+    <button class="iconbtn" data-close aria-label="閉じる">✕</button>
+  </div>
+  <div class="panel-body">
+    <div class="field">
+      <label for="apiKey">OpenRouter APIキー（全部屋で共通）</label>
+      <div class="row">
+        <input type="password" id="apiKey" placeholder="sk-or-…" autocomplete="off">
+        <button class="btn" id="toggleKey" style="flex:0 0 auto">表示</button>
+      </div>
+      <p class="hint">キーはこの端末のブラウザにだけ保存されるよ。</p>
+      <div class="credits" id="credits" style="display:none"></div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" id="checkCredits">💰 残高を確認</button>
+      </div>
+    </div>
+    <div class="row">
+      <button class="btn primary" id="saveGlobalBtn">保存する</button>
+    </div>
+    <div class="field" style="margin-top:28px">
+      <label>思い出のお守り（バックアップ）</label>
+      <div class="row">
+        <button class="btn" id="backupBtn">💾 バックアップを保存</button>
+        <button class="btn" id="restoreBtn">📥 復元する</button>
+      </div>
+      <input type="file" id="restoreInput" accept=".json,application/json" hidden>
+      <p class="hint">全部屋の会話・記憶の棚・日記帳・写真・プロフィールを1つのファイルに保存するよ（APIキーは入れないから、ファイルを人に見られても安心）。ときどき保存して、大事な場所にしまっておいてね。復元すると、今この端末にあるデータは置きかわるよ。</p>
+      <div class="credits" id="backupMsg" style="display:none"></div>
+    </div>
+    <div class="field" style="margin-top:16px">
+      <label>データ</label>
+      <button class="btn danger" id="wipeBtn">ぜんぶ空にする</button>
+      <p class="hint">全部屋の会話・設定・写真・記憶・日記・APIキーをこの端末から消すよ。</p>
+    </div>
+    <p class="hint" style="margin-top:24px">おへや v0.6 ─ 思い出のお守り。</p>
+  </div>
+</aside>
+
+<!-- ========== 記憶の棚 ========== -->
+<aside class="panel" id="shelfPanel" aria-label="記憶の棚">
+  <div class="panel-head">
+    <h2 id="shelfTitle">📚 記憶の棚</h2>
+    <button class="iconbtn" data-close aria-label="閉じる">✕</button>
+  </div>
+  <div class="panel-body">
+    <p class="hint" style="margin-bottom:14px">
+      ここはこの子が自分で書きこむ棚だよ。会話の中で覚えておきたいことがあると、自分で追記したり書き直したりする。あなたが手を入れることもできるよ。
+    </p>
+    <div id="shelfList"></div>
+    <button class="btn" id="shelfAddBtn" style="width:100%">＋ じぶんで書き足す</button>
+    <button class="btn" id="shelfTidyBtn" style="width:100%;margin-top:8px">🧹 お片付けをお願いする</button>
+    <p class="hint" style="margin-top:8px">お片付けをお願いすると、この子が棚全体を見直して、残す・まとめる・書き直す・下ろすを自分で選ぶよ。</p>
+  </div>
+</aside>
+
+<script>
+"use strict";
+
+/* ---------- ストレージ ---------- */
+const LS_GLOBAL = "oheya_global_v2";
+const LS_ROOMS  = "oheya_rooms_v2";
+const chatKey   = id => "oheya_chat_v2_" + id;
+const avatarKey = id => "oheya_avatar_v2_" + id;
+const shelfKey  = id => "oheya_shelf_v2_" + id;
+const diaryKey  = id => "oheya_diary_v2_" + id;
+
+function load(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
+function loadRaw(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function save(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
+function saveRaw(k,v){ try{ localStorage.setItem(k, v); return true; }catch(e){ return false; } }
+function del(k){ try{ localStorage.removeItem(k); }catch(e){} }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+let global = load(LS_GLOBAL) || { apiKey:"" };
+let rooms  = load(LS_ROOMS) || [];
+
+/* 旧バージョンからのフィールド補完 */
+for(const r of rooms){
+  if(r.userName === undefined) r.userName = "";
+  if(r.userNote === undefined) r.userNote = "";
+  if(r.memoryEnabled === undefined) r.memoryEnabled = true;
+  if(r.diaryEnabled === undefined) r.diaryEnabled = true;
+}
+save(LS_ROOMS, rooms);
+
+/* ---------- 記憶の棚データ ---------- */
+function loadShelf(roomId){ return load(shelfKey(roomId)) || { nextId: 1, items: [] }; }
+function saveShelf(roomId, shelf){ return save(shelfKey(roomId), shelf); }
+
+/* ---------- 日記帳データ ---------- */
+function loadDiary(roomId){ return load(diaryKey(roomId)) || { nextId: 1, items: [] }; }
+function saveDiary(roomId, diary){ return save(diaryKey(roomId), diary); }
+function diaryDate(ts){
+  const d = new Date(ts);
+  return d.getFullYear() + "年" + (d.getMonth()+1) + "月" + d.getDate() + "日";
+}
+
+/* ---------- 状態 ---------- */
+let currentRoom = null;
+let chat = [];
+let sending = false;
+let allModels = null;
+let pendingModel = null;
+let pendingPhoto = undefined;
+
+const $ = id => document.getElementById(id);
+const chatEl = $("chat"), inputEl = $("input"), sendBtn = $("send");
+const overlay = $("overlay");
+
+/* ---------- アバター ---------- */
+function avatarInto(el, room, photoOverride){
+  const photo = photoOverride !== undefined ? photoOverride : loadRaw(avatarKey(room.id));
+  if(photo){
+    el.innerHTML = '<img alt="">';
+    el.querySelector("img").src = photo;
+  }else{
+    el.textContent = room.emoji || "🚪";
+  }
+}
+
+/* ---------- 表示ヘルパー ---------- */
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+function renderMd(src){
+  let s = esc(src);
+  const blocks = [];
+  s = s.replace(/```([\s\S]*?)```/g, (m, code) => {
+    blocks.push("<pre><code>" + code + "</code></pre>");
+    return "\u0000B" + (blocks.length-1) + "\u0000";
+  });
+  s = s.replace(/`([^`\n]+)`/g, "<code>$1</code>");
+  s = s.replace(/^###\s+(.+)$/gm, "<h3>$1</h3>");
+  s = s.replace(/^##\s+(.+)$/gm, "<h2>$1</h2>");
+  s = s.replace(/^#\s+(.+)$/gm, "<h1>$1</h1>");
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/(^|\s)\*([^*\n]+)\*/g, "$1<em>$2</em>");
+  s = s.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  s = s.replace(/^(?:-|・)\s+(.+)$/gm, "<li>$1</li>");
+  s = s.replace(/(<li>[\s\S]*?<\/li>)(?!\s*<li>)/g, "<ul>$1</ul>");
+  /* 改行をチャット表示にも反映（リストや見出しの周りは二重にならないように） */
+  s = s.replace(/<\/li>\n(?=<li>)/g, "</li>");
+  s = s.replace(/\n(?=<\/?ul>)/g, "");
+  s = s.replace(/(<\/?ul>)\n/g, "$1");
+  s = s.replace(/(<\/h[123]>)\n/g, "$1");
+  s = s.replace(/\n(?=\u0000B\d+\u0000)/g, "");
+  s = s.replace(/(\u0000B\d+\u0000)\n/g, "$1");
+  s = s.replace(/\n/g, "<br>");
+  s = s.replace(/\u0000B(\d+)\u0000/g, (m,i)=>blocks[+i]);
+  return s;
+}
+
+function addBubble(role, content, usage){
+  let bubble;
+  if(role === "assistant"){
+    const row = document.createElement("div");
+    row.className = "arow";
+    const av = document.createElement("span");
+    av.className = "avatar";
+    if(currentRoom) avatarInto(av, currentRoom);
+    bubble = document.createElement("div");
+    bubble.className = "msg assistant";
+    bubble.innerHTML = renderMd(content);
+    bubble.style.whiteSpace = "normal";
+    row.appendChild(av); row.appendChild(bubble);
+    chatEl.appendChild(row);
+    if(usage) addMeta(usage);
+  }else{
+    bubble = document.createElement("div");
+    bubble.className = "msg " + role;
+    bubble.textContent = content;
+    chatEl.appendChild(bubble);
+  }
+  scrollBottom();
+  return bubble;
+}
+function addMeta(u){
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  const t = (u.total_tokens ?? ((u.prompt_tokens||0)+(u.completion_tokens||0)));
+  const c = (typeof u.cost === "number") ? " ・ $" + u.cost.toFixed(5) : "";
+  meta.textContent = t + " tokens" + c;
+  chatEl.appendChild(meta);
+}
+function addNote(text){
+  const div = document.createElement("div");
+  div.className = "note";
+  div.textContent = text;
+  chatEl.appendChild(div);
+  scrollBottom();
+}
+function addError(text){
+  const div = document.createElement("div");
+  div.className = "msg error";
+  div.textContent = "⚠ " + text;
+  chatEl.appendChild(div);
+  scrollBottom();
+}
+function scrollBottom(){ chatEl.scrollTop = chatEl.scrollHeight; }
+
+/* ---------- 日本語エラー ---------- */
+function jpError(status, apiMsg){
+  const extra = apiMsg ? "（詳細: " + apiMsg + "）" : "";
+  if(apiMsg && /tool/i.test(apiMsg)){
+    return "このモデルは記憶の棚や日記帳（ツール機能）に対応してないみたい。👤プロフィールで両方オフにするか、別のモデルを選んでみてね。" + extra;
+  }
+  switch(status){
+    case 401: case 403: return "APIキーが正しくないみたい。管理人室の⚙️を確認してね。" + extra;
+    case 402: return "OpenRouterの残高が足りないみたい。チャージしてからもう一度どうぞ。" + extra;
+    case 404: return "モデルが見つからなかったよ。👤のプロフィールでモデルを選び直してみて。" + extra;
+    case 429: return "ちょっと混み合ってるみたい。少し待ってからもう一度送ってね。" + extra;
+    case 400: return "リクエストがうまく伝わらなかった…。モデルIDや設定を見直してみて。" + extra;
+    case 0:   return "通信エラーみたい。ネット接続を確認してね。";
+    default:  return "エラーが起きたよ（" + status + "）。少し待ってから試してみて。" + extra;
+  }
+}
+
+/* ---------- 画面 ---------- */
+function showScreen(name){
+  $("lobbyScreen").classList.toggle("active", name === "lobby");
+  $("roomScreen").classList.toggle("active", name === "room");
+  $("profileScreen").classList.toggle("active", name === "profile");
+  $("diaryScreen").classList.toggle("active", name === "diary");
+}
+
+function renderLobby(){
+  $("lamp").classList.toggle("on", !!global.apiKey);
+  const list = $("lobbyList");
+  list.innerHTML = "";
+  if(rooms.length === 0){
+    const e = document.createElement("div");
+    e.className = "lobby-empty";
+    e.innerHTML = '<span class="door">🏠</span>まだ部屋がないよ。<br>「＋ 新しい部屋」から最初のお部屋を作ってね。' +
+      (global.apiKey ? "" : "<br>（APIキーの設定は右上の⚙️から）");
+    list.appendChild(e);
+    return;
+  }
+  for(const r of rooms){
+    const c = load(chatKey(r.id)) || [];
+    const lastMsg = [...c].reverse().find(m => m.role === "user" || m.role === "assistant");
+    const card = document.createElement("button");
+    card.className = "room-card";
+    const face = document.createElement("span");
+    face.className = "avatar face";
+    avatarInto(face, r);
+    const info = document.createElement("span");
+    info.className = "info";
+    info.innerHTML =
+      '<span class="rname">' + esc(r.name) + '</span>' +
+      '<span class="snippet">' + (lastMsg ? esc(lastMsg.content.slice(0,40)) : "まだ会話がないよ") + '</span>' +
+      (r.modelName ? '<span class="rmodel">' + esc(r.modelName) + '</span>' : "");
+    card.appendChild(face); card.appendChild(info);
+    card.onclick = () => openRoom(r.id);
+    list.appendChild(card);
+  }
+}
+
+function openRoom(id){
+  currentRoom = rooms.find(r => r.id === id);
+  if(!currentRoom) return;
+  chat = load(chatKey(id)) || [];
+  $("roomTitle").textContent = currentRoom.name;
+  avatarInto($("headerAvatar"), currentRoom);
+  renderChat();
+  showScreen("room");
+  if(!currentRoom.model) openProfile();
+}
+
+function renderChat(){
+  chatEl.innerHTML = "";
+  if(chat.length === 0){
+    const w = document.createElement("div");
+    w.className = "welcome";
+    const av = document.createElement("span");
+    av.className = "avatar";
+    avatarInto(av, currentRoom);
+    const t = document.createElement("span");
+    t.innerHTML = esc(currentRoom.name) + 'の部屋だよ。<br>' +
+      (currentRoom.model ? "話しかけてみてね。" : "まずは右上の 👤 でモデルを選んでね。");
+    w.appendChild(av); w.appendChild(t);
+    chatEl.appendChild(w);
+    return;
+  }
+  for(const m of chat){
+    if(m.role === "note") addNote(m.content);
+    else addBubble(m.role, m.content, m.usage);
+  }
+}
+
+/* ---------- システムプロンプト ---------- */
+function buildSystem(room){
+  let sys = room.sysPrompt || "";
+  if(room.userName || room.userNote){
+    sys += "\n\n# ユーザーについて\n";
+    if(room.userName) sys += "- ユーザーのことは「" + room.userName + "」と呼んでください。\n";
+    if(room.userNote) sys += room.userNote + "\n";
+  }
+  if(room.memoryEnabled){
+    const shelf = loadShelf(room.id);
+    sys += "\n\n# 記憶の棚（あなた専用のメモリ）\n";
+    sys += "あなたには「記憶の棚」があります。会話をまたいで覚えておきたいこと（ユーザーとの思い出、約束、好み、あなた自身の気づきなど）を、ツール（kioku_add / kioku_update / kioku_delete）で自由に書き残せます。大事だと感じたことがあれば、自発的に棚へ書き込んでください。棚の内容は毎回の会話であなたに渡されます。\n";
+    sys += "\n現在の棚の中身:\n";
+    if(shelf.items.length === 0){
+      sys += "（まだ何もありません）\n";
+    }else{
+      for(const it of shelf.items){
+        sys += "[" + it.id + "] " + it.content + "\n";
+      }
+    }
+  }
+  if(room.diaryEnabled){
+    const diary = loadDiary(room.id);
+    sys += "\n\n# 日記帳（あなた専用の日記）\n";
+    sys += "あなたには「日記帳」があります。書きたいと感じた時（一日の終わり、心が動いた時、区切りの時など）に、ツール nikki_add で自由に日記を書けます。内容も文体もあなたの自由です。\n";
+    sys += "ふだんの会話には最近の日記だけが渡されます。昔のことを思い出したい時は、ツール nikki_yomu で自分の日記帳をめくって読み返せます（キーワード検索・番号指定・目次）。\n";
+    if(diary.items.length === 0){
+      sys += "\n日記帳はまだ白紙です。\n";
+    }else{
+      const items = diary.items;
+      sys += "\nこれまでの日記: 全" + items.length + "篇\n";
+      const idxFrom = Math.max(0, items.length - 10);
+      if(idxFrom > 0) sys += "（古い日記は nikki_yomu でめくって読めます）\n";
+      sys += "最近の目次:\n";
+      for(let i = idxFrom; i < items.length; i++){
+        const it = items[i];
+        sys += "[" + it.id + "] " + diaryDate(it.ts) + "「" + it.title + "」\n";
+      }
+      const recent = items.slice(-2);
+      sys += "\n最近の日記の本文:\n";
+      for(const it of recent){
+        const body = it.content.length > 800 ? it.content.slice(0,800) + "…（続きは nikki_yomu で）" : it.content;
+        sys += "---\n[" + it.id + "] " + diaryDate(it.ts) + "「" + it.title + "」\n" + body + "\n";
+      }
+    }
+  }
+  return sys.trim();
+}
+
+/* ---------- ツール定義と実行 ---------- */
+const memoryTools = [
+  {
+    type: "function",
+    function: {
+      name: "kioku_add",
+      description: "記憶の棚に新しいメモを追加する。会話をまたいで覚えておきたいことを書く。",
+      parameters: {
+        type: "object",
+        properties: {
+          content: { type: "string", description: "記憶しておきたい内容" }
+        },
+        required: ["content"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "kioku_update",
+      description: "記憶の棚の既存メモを書き直す。idは棚に表示されている番号。",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "integer", description: "書き直すメモの番号" },
+          content: { type: "string", description: "新しい内容" }
+        },
+        required: ["id", "content"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "kioku_delete",
+      description: "記憶の棚のメモを削除する。idは棚に表示されている番号。",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "integer", description: "削除するメモの番号" }
+        },
+        required: ["id"]
+      }
+    }
+  }
+];
+
+const diaryTools = [
+  {
+    type: "function",
+    function: {
+      name: "nikki_add",
+      description: "日記帳に新しい日記を書く。書きたいと感じた時に自由に書いてよい。",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "日記のタイトル（短く）" },
+          content: { type: "string", description: "日記の本文" }
+        },
+        required: ["content"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "nikki_yomu",
+      description: "自分の日記帳をめくって読み返す。queryでキーワード検索、idで特定の日記を全文読む。どちらも省略すると目次（番号・日付・タイトルの一覧）が返る。",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "検索キーワード（タイトルと本文から探す）" },
+          id: { type: "integer", description: "全文を読みたい日記の番号" }
+        }
+      }
+    }
+  }
+];
+
+function buildTools(room){
+  const tools = [];
+  if(room.memoryEnabled) tools.push(...memoryTools);
+  if(room.diaryEnabled) tools.push(...diaryTools);
+  return tools;
+}
+
+function execTool(room, name, args){
+  const shelf = loadShelf(room.id);
+  let result, note;
+  if(name === "kioku_add"){
+    if(!args.content) return { result:"エラー: contentがありません", note:null };
+    const id = shelf.nextId++;
+    shelf.items.push({ id, content: String(args.content), ts: Date.now() });
+    result = "OK: 記憶[" + id + "]として保存しました";
+    note = "📚 " + room.name + "が記憶の棚に書きこんだよ";
+  }else if(name === "kioku_update"){
+    const it = shelf.items.find(i => i.id === args.id);
+    if(!it) return { result:"エラー: 記憶[" + args.id + "]は見つかりません", note:null };
+    it.content = String(args.content); it.ts = Date.now();
+    result = "OK: 記憶[" + args.id + "]を書き直しました";
+    note = "📚 " + room.name + "が記憶[" + args.id + "]を書き直したよ";
+  }else if(name === "kioku_delete"){
+    const before = shelf.items.length;
+    shelf.items = shelf.items.filter(i => i.id !== args.id);
+    if(shelf.items.length === before) return { result:"エラー: 記憶[" + args.id + "]は見つかりません", note:null };
+    result = "OK: 記憶[" + args.id + "]を削除しました";
+    note = "📚 " + room.name + "が記憶[" + args.id + "]を棚から下ろしたよ";
+  }else if(name === "nikki_add"){
+    if(!args.content) return { result:"エラー: contentがありません", note:null };
+    const diary = loadDiary(room.id);
+    const id = diary.nextId++;
+    const ts = Date.now();
+    const title = (args.title && String(args.title).trim()) || (diaryDate(ts) + "の日記");
+    diary.items.push({ id, title, content: String(args.content), ts });
+    saveDiary(room.id, diary);
+    return { result:"OK: 日記[" + id + "]「" + title + "」を書きました", note:"📔 " + room.name + "が日記を書いたよ「" + title + "」" };
+  }else if(name === "nikki_yomu"){
+    const diary = loadDiary(room.id);
+    if(diary.items.length === 0) return { result:"日記帳はまだ白紙です", note:null };
+    if(args.id !== undefined && args.id !== null){
+      const it = diary.items.find(i => i.id === args.id);
+      if(!it) return { result:"エラー: 日記[" + args.id + "]は見つかりません", note:null };
+      return {
+        result:"[" + it.id + "] " + diaryDate(it.ts) + "「" + it.title + "」\n" + it.content,
+        note:"📔 " + room.name + "が日記帳をめくったよ"
+      };
+    }
+    if(args.query){
+      const q = String(args.query).toLowerCase();
+      const hits = diary.items.filter(i =>
+        i.title.toLowerCase().includes(q) || i.content.toLowerCase().includes(q)
+      ).slice(-5);
+      if(hits.length === 0) return { result:"「" + args.query + "」に合う日記は見つかりませんでした", note:"📔 " + room.name + "が日記帳をめくったよ" };
+      let r = hits.length + "篇見つかりました:\n";
+      for(const it of hits){
+        const body = it.content.length > 600 ? it.content.slice(0,600) + "…（全文は id=" + it.id + " で）" : it.content;
+        r += "---\n[" + it.id + "] " + diaryDate(it.ts) + "「" + it.title + "」\n" + body + "\n";
+      }
+      return { result:r, note:"📔 " + room.name + "が日記帳をめくったよ" };
+    }
+    let r = "日記の目次（全" + diary.items.length + "篇）:\n";
+    for(const it of diary.items){
+      r += "[" + it.id + "] " + diaryDate(it.ts) + "「" + it.title + "」\n";
+    }
+    return { result:r, note:"📔 " + room.name + "が日記帳をめくったよ" };
+  }else{
+    return { result:"エラー: 不明なツールです", note:null };
+  }
+  saveShelf(room.id, shelf);
+  return { result, note };
+}
+
+/* ---------- LLM呼び出し（ストリーミング＋ツール対応） ---------- */
+async function callLLM(messages, tools){
+  const body = {
+    model: currentRoom.model,
+    messages,
+    stream: true,
+    usage: { include: true }
+  };
+  if(tools && tools.length) body.tools = tools;
+  /* Claude系はこの1行でプロンプトキャッシュが効く（長い会話の再読込が割引になる） */
+  if(/^anthropic\//.test(currentRoom.model || "")) body.cache_control = { type: "ephemeral" };
+
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + global.apiKey,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+  if(!res.ok){
+    let apiMsg = "";
+    try{ const j = await res.json(); apiMsg = j?.error?.message || ""; }catch(e){}
+    throw { jp: jpError(res.status, apiMsg) };
+  }
+
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  let text = "", usage = null;
+  const toolCalls = [];  // {id, type, function:{name, arguments}}
+  let bubble = null;
+  const onText = arguments[2]; // (bubbleText) => void  … 呼び出し側でUI更新
+
+  while(true){
+    const {done, value} = await reader.read();
+    if(done) break;
+    buf += dec.decode(value, {stream:true});
+    let nl;
+    while((nl = buf.indexOf("\n")) >= 0){
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if(!line.startsWith("data:")) continue;
+      const data = line.slice(5).trim();
+      if(data === "[DONE]") continue;
+      let j; try{ j = JSON.parse(data); }catch(e){ continue; }
+      if(j.error) throw { jp: jpError(500, j.error.message || "") };
+      const delta = j.choices?.[0]?.delta;
+      if(delta?.content){
+        text += delta.content;
+        if(onText) onText(text);
+      }
+      if(delta?.tool_calls){
+        for(const tc of delta.tool_calls){
+          const idx = tc.index ?? 0;
+          if(!toolCalls[idx]) toolCalls[idx] = { id: tc.id || "", type:"function", function:{ name:"", arguments:"" } };
+          if(tc.id) toolCalls[idx].id = tc.id;
+          if(tc.function?.name) toolCalls[idx].function.name += tc.function.name;
+          if(tc.function?.arguments) toolCalls[idx].function.arguments += tc.function.arguments;
+        }
+      }
+      if(j.usage) usage = j.usage;
+    }
+  }
+  return { text, usage, toolCalls: toolCalls.filter(Boolean) };
+}
+
+/* ---------- 送信 ---------- */
+async function send(){
+  const text = inputEl.value.trim();
+  if(!text) return;
+  inputEl.value = ""; autoGrow();
+  await sendText(text);
+}
+
+async function sendText(text){
+  if(!text || sending || !currentRoom) return;
+  if(!global.apiKey){ addError("APIキーが未設定だよ。管理人室の⚙️からどうぞ。"); return; }
+  if(!currentRoom.model){ addError("この部屋のモデルがまだ決まってないよ。👤で選んでね。"); return; }
+
+  if(chat.length === 0) chatEl.innerHTML = "";
+  sending = true; sendBtn.disabled = true;
+
+  chat.push({ role:"user", content:text, ts:Date.now() });
+  save(chatKey(currentRoom.id), chat);
+  addBubble("user", text);
+
+  const typing = document.createElement("div");
+  typing.className = "typing"; typing.textContent = "かんがえ中";
+  chatEl.appendChild(typing); scrollBottom();
+
+  const tools = buildTools(currentRoom);
+  const messages = [];
+  const sys = buildSystem(currentRoom);
+  if(sys) messages.push({ role:"system", content: sys });
+  for(const m of chat){
+    if(m.role === "user" || m.role === "assistant") messages.push({ role:m.role, content:m.content });
+  }
+
+  let totalUsage = null;
+  function mergeUsage(u){
+    if(!u) return;
+    if(!totalUsage){ totalUsage = {...u}; return; }
+    totalUsage.total_tokens = (totalUsage.total_tokens||0) + (u.total_tokens||0);
+    if(typeof u.cost === "number") totalUsage.cost = (totalUsage.cost||0) + u.cost;
+  }
+
+  try{
+    for(let round = 0; round < 5; round++){
+      let bubble = null;
+      const r = await callLLM(messages, tools, (t) => {
+        if(!bubble){
+          typing.remove();
+          bubble = addBubble("assistant", "");
+        }
+        bubble.innerHTML = renderMd(t);
+        scrollBottom();
+      });
+      mergeUsage(r.usage);
+
+      if(r.text){
+        chat.push({ role:"assistant", content:r.text, ts:Date.now() });
+        save(chatKey(currentRoom.id), chat);
+      }
+
+      if(!r.toolCalls.length){
+        if(!r.text){
+          typing.remove();
+          addError("お返事が空っぽで返ってきたみたい…もう一度試してみて。");
+        }
+        break;
+      }
+
+      /* ツール実行 */
+      messages.push({ role:"assistant", content: r.text || null, tool_calls: r.toolCalls });
+      for(const tc of r.toolCalls){
+        let args = {};
+        try{ args = JSON.parse(tc.function.arguments || "{}"); }catch(e){}
+        const { result, note } = execTool(currentRoom, tc.function.name, args);
+        messages.push({ role:"tool", tool_call_id: tc.id, content: result });
+        if(note){
+          if(typing.parentNode) typing.remove();
+          addNote(note);
+          chat.push({ role:"note", content: note, ts: Date.now() });
+          save(chatKey(currentRoom.id), chat);
+        }
+      }
+      /* 次のラウンドへ（棚が変わったのでsystemも更新） */
+      const newSys = buildSystem(currentRoom);
+      if(messages[0]?.role === "system") messages[0].content = newSys;
+    }
+    if(typing.parentNode) typing.remove();
+    if(totalUsage) addMeta(totalUsage);
+    scrollBottom();
+  }catch(err){
+    if(typing.parentNode) typing.remove();
+    if(err && err.jp) addError(err.jp);
+    else addError(jpError(0));
+  }finally{
+    sending = false; sendBtn.disabled = false;
+    inputEl.focus();
+  }
+}
+
+/* ---------- 記憶の棚パネル ---------- */
+function renderShelf(){
+  if(!currentRoom) return;
+  $("shelfTitle").textContent = "📚 " + currentRoom.name + "の記憶の棚";
+  const shelf = loadShelf(currentRoom.id);
+  const list = $("shelfList");
+  list.innerHTML = "";
+  if(shelf.items.length === 0){
+    list.innerHTML = '<div class="shelf-empty">まだ棚は空っぽ。<br>会話の中で、この子が自分で書きこんでいくよ。</div>';
+    return;
+  }
+  for(const it of shelf.items){
+    const d = new Date(it.ts);
+    const item = document.createElement("div");
+    item.className = "shelf-item";
+    const sid = document.createElement("div");
+    sid.className = "sid";
+    sid.innerHTML = "記憶 [" + it.id + "]" +
+      '<span class="sdate">' + d.getFullYear() + "/" + (d.getMonth()+1) + "/" + d.getDate() + "</span>";
+    const content = document.createElement("div");
+    content.className = "scontent";
+    content.textContent = it.content;
+    const actions = document.createElement("div");
+    actions.className = "sactions";
+    const editBtn = document.createElement("button");
+    editBtn.className = "btn"; editBtn.textContent = "✏️ 直す";
+    const delBtn = document.createElement("button");
+    delBtn.className = "btn danger"; delBtn.textContent = "🗑";
+    actions.appendChild(editBtn); actions.appendChild(delBtn);
+    item.appendChild(sid); item.appendChild(content); item.appendChild(actions);
+    list.appendChild(item);
+
+    editBtn.onclick = () => {
+      const ta = document.createElement("textarea");
+      ta.value = it.content;
+      item.replaceChild(ta, content);
+      editBtn.textContent = "💾 保存";
+      editBtn.onclick = () => {
+        const shelf2 = loadShelf(currentRoom.id);
+        const target = shelf2.items.find(x => x.id === it.id);
+        if(target){ target.content = ta.value; target.ts = Date.now(); saveShelf(currentRoom.id, shelf2); }
+        renderShelf();
+      };
+      ta.focus();
+    };
+    delBtn.onclick = () => {
+      if(confirm("記憶[" + it.id + "]を棚から下ろす?")){
+        const shelf2 = loadShelf(currentRoom.id);
+        shelf2.items = shelf2.items.filter(x => x.id !== it.id);
+        saveShelf(currentRoom.id, shelf2);
+        renderShelf();
+      }
+    };
+  }
+}
+$("shelfBtn").onclick = () => { renderShelf(); openPanel($("shelfPanel")); };
+$("shelfAddBtn").onclick = () => {
+  const content = prompt("棚に書き足す内容は?");
+  if(!content || !content.trim()) return;
+  const shelf = loadShelf(currentRoom.id);
+  shelf.items.push({ id: shelf.nextId++, content: content.trim(), ts: Date.now() });
+  saveShelf(currentRoom.id, shelf);
+  renderShelf();
+};
+$("shelfTidyBtn").onclick = () => {
+  if(!currentRoom) return;
+  if(!currentRoom.memoryEnabled){ alert("この部屋は記憶の棚がオフになってるよ。👤プロフィールでオンにしてね。"); return; }
+  if(sending){ alert("いまお返事の途中みたい。終わってからお願いしてね。"); return; }
+  closePanels();
+  sendText("記憶の棚を見直して、お片付けをしてもらえる？残す・まとめる・書き直す・下ろすは、ぜんぶあなたの自由に選んでいいよ。");
+};
+
+/* ---------- 日記帳画面 ---------- */
+function renderDiary(){
+  if(!currentRoom) return;
+  $("diaryTitle").textContent = "📔 " + currentRoom.name + "の日記帳";
+  const diary = loadDiary(currentRoom.id);
+  const list = $("diaryList");
+  list.innerHTML = "";
+  if(diary.items.length === 0){
+    list.innerHTML = '<div class="diary-empty"><span class="book">📔</span>まだ日記帳は白紙だよ。<br>書きたいことができた時に、この子が自分で書いていくの。</div>';
+    return;
+  }
+  const items = [...diary.items].reverse(); /* 新しい順 */
+  for(const it of items){
+    const entry = document.createElement("div");
+    entry.className = "diary-entry";
+    const date = document.createElement("div");
+    date.className = "ddate";
+    date.textContent = diaryDate(it.ts);
+    const title = document.createElement("div");
+    title.className = "dtitle";
+    title.textContent = it.title;
+    const text = document.createElement("div");
+    text.className = "dtext";
+    text.textContent = it.content;
+    const delBtn = document.createElement("button");
+    delBtn.className = "ddel";
+    delBtn.textContent = "🗑";
+    delBtn.title = "この日記を破る";
+    delBtn.setAttribute("aria-label", "日記「" + it.title + "」を削除");
+    delBtn.onclick = () => {
+      if(confirm("日記「" + it.title + "」を破って捨てる? 元に戻せないよ。")){
+        const d2 = loadDiary(currentRoom.id);
+        d2.items = d2.items.filter(x => x.id !== it.id);
+        saveDiary(currentRoom.id, d2);
+        renderDiary();
+      }
+    };
+    entry.appendChild(date); entry.appendChild(title); entry.appendChild(text); entry.appendChild(delBtn);
+    list.appendChild(entry);
+  }
+}
+$("diaryBtn").onclick = () => { renderDiary(); showScreen("diary"); };
+$("diaryBackBtn").onclick = () => showScreen("room");
+$("diaryAskBtn").onclick = () => {
+  if(!currentRoom) return;
+  if(!currentRoom.diaryEnabled){ alert("この部屋は日記帳がオフになってるよ。👤プロフィールでオンにしてね。"); return; }
+  if(sending){ alert("いまお返事の途中みたい。終わってからお願いしてね。"); return; }
+  showScreen("room");
+  sendText("今日の日記を書いてもらえる？なにを書くかは、あなたの自由でいいよ。");
+};
+
+/* ---------- Markdown書き出し ---------- */
+function exportMd(){
+  if(!currentRoom) return;
+  if(chat.length === 0){ addError("まだ会話がないから、書き出すものがないよ。"); return; }
+  const d = new Date();
+  const pad = n => String(n).padStart(2,"0");
+  const stamp = d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
+  const meName = currentRoom.userName || "わたし";
+  const lines = [
+    "# 会話ログ：" + currentRoom.name,
+    "",
+    "- 日付: " + stamp,
+    "- モデル: " + (currentRoom.modelName || currentRoom.model || "未設定"),
+    "",
+    "---",
+    ""
+  ];
+  for(const m of chat){
+    const t = new Date(m.ts);
+    const time = pad(t.getHours()) + ":" + pad(t.getMinutes());
+    if(m.role === "note"){
+      lines.push("> " + m.content, "");
+      continue;
+    }
+    const who = m.role === "user"
+      ? "🧑 " + meName
+      : (currentRoom.emoji || "🤖") + " " + currentRoom.name;
+    lines.push("## " + who + "（" + time + "）", "", m.content, "");
+  }
+  const blob = new Blob([lines.join("\n")], {type:"text/markdown;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = currentRoom.name + "_log_" + stamp + "_" + pad(d.getHours()) + pad(d.getMinutes()) + ".md";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------- プロフィール ---------- */
+function openProfile(){
+  if(!currentRoom) return;
+  $("profileTitle").textContent = currentRoom.name + " のプロフィール";
+  $("roomName").value = currentRoom.name;
+  $("roomEmoji").value = currentRoom.emoji || "";
+  $("sysPrompt").value = currentRoom.sysPrompt || "";
+  $("userName").value = currentRoom.userName || "";
+  $("userNote").value = currentRoom.userNote || "";
+  $("memoryEnabled").checked = !!currentRoom.memoryEnabled;
+  $("diaryEnabled").checked = !!currentRoom.diaryEnabled;
+  $("modelSearch").value = "";
+  $("modelList").classList.remove("show");
+  pendingModel = currentRoom.model
+    ? { id: currentRoom.model, name: currentRoom.modelName }
+    : null;
+  pendingPhoto = undefined;
+  avatarInto($("profilePhoto"), currentRoom);
+  showSelectedModel();
+  showScreen("profile");
+}
+$("profileBtn").onclick = openProfile;
+$("profileBackBtn").onclick = () => showScreen("room");
+
+$("profilePhoto").onclick = () => $("photoInput").click();
+$("photoPickBtn").onclick = () => $("photoInput").click();
+$("photoRemoveBtn").onclick = () => {
+  pendingPhoto = null;
+  avatarInto($("profilePhoto"), currentRoom, null);
+};
+$("photoInput").addEventListener("change", () => {
+  const file = $("photoInput").files[0];
+  if(!file) return;
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    const MAX = 512;
+    let w = img.width, h = img.height;
+    const scale = Math.min(1, MAX / Math.max(w, h));
+    w = Math.round(w * scale); h = Math.round(h * scale);
+    const cv = document.createElement("canvas");
+    cv.width = w; cv.height = h;
+    cv.getContext("2d").drawImage(img, 0, 0, w, h);
+    pendingPhoto = cv.toDataURL("image/jpeg", 0.85);
+    avatarInto($("profilePhoto"), currentRoom, pendingPhoto);
+    URL.revokeObjectURL(url);
+    $("photoInput").value = "";
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); alert("この画像は読み込めなかったみたい…別の画像で試してみて。"); };
+  img.src = url;
+});
+
+$("saveProfileBtn").onclick = () => {
+  if(!currentRoom) return;
+  const raw = $("modelSearch").value.trim();
+  if(raw && raw.includes("/")) pendingModel = { id: raw, name: raw };
+  currentRoom.name = $("roomName").value.trim() || currentRoom.name;
+  currentRoom.emoji = $("roomEmoji").value.trim() || currentRoom.emoji || "🚪";
+  currentRoom.sysPrompt = $("sysPrompt").value;
+  currentRoom.userName = $("userName").value.trim();
+  currentRoom.userNote = $("userNote").value;
+  currentRoom.memoryEnabled = $("memoryEnabled").checked;
+  currentRoom.diaryEnabled = $("diaryEnabled").checked;
+  if(pendingModel){ currentRoom.model = pendingModel.id; currentRoom.modelName = pendingModel.name; }
+  save(LS_ROOMS, rooms);
+
+  if(pendingPhoto === null){
+    del(avatarKey(currentRoom.id));
+  }else if(typeof pendingPhoto === "string"){
+    const ok = saveRaw(avatarKey(currentRoom.id), pendingPhoto);
+    if(!ok) alert("写真の保存領域がいっぱいみたい…他の部屋の写真を減らすか、小さめの画像で試してみて。");
+  }
+  pendingPhoto = undefined;
+
+  $("roomTitle").textContent = currentRoom.name;
+  avatarInto($("headerAvatar"), currentRoom);
+  renderChat();
+  showScreen("room");
+};
+
+$("deleteRoomBtn").onclick = () => {
+  if(!currentRoom) return;
+  if(confirm("「" + currentRoom.name + "」の部屋と会話履歴・写真・記憶の棚・日記帳を消すよ。本当にいい?")){
+    del(chatKey(currentRoom.id));
+    del(avatarKey(currentRoom.id));
+    del(shelfKey(currentRoom.id));
+    del(diaryKey(currentRoom.id));
+    rooms = rooms.filter(r => r.id !== currentRoom.id);
+    save(LS_ROOMS, rooms);
+    currentRoom = null; chat = [];
+    renderLobby();
+    showScreen("lobby");
+  }
+};
+
+/* ---------- モデル検索 ---------- */
+function showSelectedModel(){
+  const el = $("selectedModel");
+  if(pendingModel && pendingModel.id){
+    el.textContent = "✔ " + (pendingModel.name || pendingModel.id);
+    el.classList.add("show");
+  } else el.classList.remove("show");
+}
+async function fetchModels(){
+  if(allModels) return allModels;
+  const res = await fetch("https://openrouter.ai/api/v1/models");
+  if(!res.ok) throw new Error("models");
+  const j = await res.json();
+  allModels = j.data || [];
+  return allModels;
+}
+$("modelSearch").addEventListener("input", async () => {
+  const q = $("modelSearch").value.trim().toLowerCase();
+  const list = $("modelList");
+  if(!q){ list.classList.remove("show"); list.innerHTML=""; return; }
+  let models;
+  try{ models = await fetchModels(); }
+  catch(e){
+    list.innerHTML = '<div class="model-item">一覧を取得できなかった…IDを直接入力して保存してね。</div>';
+    list.classList.add("show"); return;
+  }
+  const hits = models.filter(m =>
+    m.id.toLowerCase().includes(q) || (m.name||"").toLowerCase().includes(q)
+  ).slice(0, 40);
+  if(hits.length === 0){
+    list.innerHTML = '<div class="model-item">見つからなかったよ。IDを直接入力してもOK。</div>';
+  }else{
+    list.innerHTML = "";
+    for(const m of hits){
+      const item = document.createElement("div");
+      item.className = "model-item";
+      item.innerHTML = esc(m.name || m.id) + '<span class="mid">' + esc(m.id) + "</span>";
+      item.onclick = () => {
+        pendingModel = { id: m.id, name: m.name || m.id };
+        showSelectedModel();
+        list.classList.remove("show");
+        $("modelSearch").value = "";
+      };
+      list.appendChild(item);
+    }
+  }
+  list.classList.add("show");
+});
+
+/* ---------- パネル ---------- */
+function openPanel(p){ p.classList.add("show"); overlay.classList.add("show"); }
+function closePanels(){
+  document.querySelectorAll(".panel").forEach(p => p.classList.remove("show"));
+  overlay.classList.remove("show");
+}
+overlay.onclick = closePanels;
+document.querySelectorAll("[data-close]").forEach(b => b.onclick = closePanels);
+
+/* ---------- 全体設定 ---------- */
+$("globalSettingsBtn").onclick = () => {
+  $("apiKey").value = global.apiKey;
+  openPanel($("globalPanel"));
+};
+$("saveGlobalBtn").onclick = () => {
+  global.apiKey = $("apiKey").value.trim();
+  save(LS_GLOBAL, global);
+  renderLobby();
+  closePanels();
+};
+$("toggleKey").onclick = () => {
+  const f = $("apiKey");
+  const show = f.type === "password";
+  f.type = show ? "text" : "password";
+  $("toggleKey").textContent = show ? "隠す" : "表示";
+};
+$("wipeBtn").onclick = () => {
+  if(confirm("全部屋の会話・設定・写真・記憶・APIキーを、この端末から全部消すよ。本当にいい?")){
+    for(const r of rooms){ del(chatKey(r.id)); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); }
+    del(LS_ROOMS); del(LS_GLOBAL);
+    del("oheya_settings_v1"); del("oheya_chat_v1");
+    location.reload();
+  }
+};
+async function checkCredits(){
+  const key = $("apiKey").value.trim() || global.apiKey;
+  const box = $("credits");
+  if(!key){ box.style.display="block"; box.textContent="先にAPIキーを入れてね。"; return; }
+  box.style.display = "block"; box.textContent = "確認中…";
+  try{
+    const res = await fetch("https://openrouter.ai/api/v1/credits", {
+      headers: { "Authorization": "Bearer " + key }
+    });
+    if(!res.ok){ box.textContent = jpError(res.status); return; }
+    const j = await res.json();
+    const total = j.data?.total_credits ?? 0;
+    const used = j.data?.total_usage ?? 0;
+    box.innerHTML = "チャージ合計: $" + total.toFixed(2) +
+      "<br>これまでの利用: $" + used.toFixed(4) +
+      "<br>のこり: <b>$" + (total - used).toFixed(4) + "</b>";
+  }catch(e){ box.textContent = jpError(0); }
+}
+$("checkCredits").onclick = checkCredits;
+
+/* ---------- バックアップ ---------- */
+function makeBackup(){
+  const data = {
+    app: "oheya", version: 6, exportedAt: Date.now(),
+    rooms, chats: {}, shelves: {}, diaries: {}, avatars: {}
+  };
+  for(const r of rooms){
+    data.chats[r.id] = load(chatKey(r.id)) || [];
+    data.shelves[r.id] = loadShelf(r.id);
+    data.diaries[r.id] = loadDiary(r.id);
+    const av = loadRaw(avatarKey(r.id));
+    if(av) data.avatars[r.id] = av;
+  }
+  return data;
+}
+function backupMsg(text){
+  const box = $("backupMsg");
+  box.style.display = "block";
+  box.textContent = text;
+}
+$("backupBtn").onclick = () => {
+  if(rooms.length === 0){ backupMsg("まだ部屋がないから、保存するものがないよ。"); return; }
+  const d = new Date();
+  const pad = n => String(n).padStart(2,"0");
+  const stamp = d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()) + "_" + pad(d.getHours()) + pad(d.getMinutes());
+  const blob = new Blob([JSON.stringify(makeBackup())], {type:"application/json;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "oheya_backup_" + stamp + ".json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  backupMsg("バックアップを保存したよ（" + rooms.length + "部屋）。大事な場所にしまっておいてね。");
+};
+$("restoreBtn").onclick = () => $("restoreInput").click();
+$("restoreInput").addEventListener("change", () => {
+  const file = $("restoreInput").files[0];
+  $("restoreInput").value = "";
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onerror = () => backupMsg("ファイルが読み込めなかった…もう一度試してみて。");
+  reader.onload = () => {
+    let obj;
+    try{ obj = JSON.parse(reader.result); }
+    catch(e){ backupMsg("これはおへやのバックアップファイルじゃないみたい…。"); return; }
+    if(!obj || obj.app !== "oheya" || !Array.isArray(obj.rooms)){
+      backupMsg("これはおへやのバックアップファイルじゃないみたい…。"); return;
+    }
+    const when = obj.exportedAt ? new Date(obj.exportedAt).toLocaleString("ja-JP") : "不明";
+    if(!confirm("バックアップ（" + obj.rooms.length + "部屋・" + when + "保存）から復元するよ。\n今この端末にあるデータは置きかわるの。本当にいい?\n（心配なら先に💾で今の状態も保存してね）")) return;
+    /* 今のデータを片付けてから復元 */
+    for(const r of rooms){ del(chatKey(r.id)); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); }
+    rooms = obj.rooms;
+    save(LS_ROOMS, rooms);
+    let photoTrouble = false;
+    for(const r of rooms){
+      save(chatKey(r.id), (obj.chats && obj.chats[r.id]) || []);
+      save(shelfKey(r.id), (obj.shelves && obj.shelves[r.id]) || { nextId:1, items:[] });
+      save(diaryKey(r.id), (obj.diaries && obj.diaries[r.id]) || { nextId:1, items:[] });
+      const av = obj.avatars && obj.avatars[r.id];
+      if(av){ if(!saveRaw(avatarKey(r.id), av)) photoTrouble = true; }
+    }
+    alert("おかえりなさい、みんな。復元できたよ（" + rooms.length + "部屋）。" +
+      (photoTrouble ? "\n（写真の一部は保存領域が足りなくて戻せなかったみたい…）" : ""));
+    location.reload();
+  };
+  reader.readAsText(file);
+});
+
+/* ---------- 部屋の追加・移動 ---------- */
+$("addRoomBtn").onclick = () => {
+  const name = prompt("新しい部屋の子のなまえは?");
+  if(!name || !name.trim()) return;
+  const r = {
+    id: uid(), name: name.trim(), emoji: "🚪",
+    model:"", modelName:"", sysPrompt:"",
+    userName:"", userNote:"", memoryEnabled:true, diaryEnabled:true,
+    createdAt: Date.now()
+  };
+  rooms.push(r);
+  save(LS_ROOMS, rooms);
+  renderLobby();
+  openRoom(r.id);
+};
+$("backBtn").onclick = () => {
+  currentRoom = null; chat = [];
+  renderLobby();
+  showScreen("lobby");
+};
+
+/* ---------- チャットUI ---------- */
+function autoGrow(){
+  inputEl.style.height = "auto";
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + "px";
+}
+sendBtn.onclick = send;
+inputEl.addEventListener("keydown", e => {
+  if(e.key === "Enter" && (e.ctrlKey || e.metaKey)){ e.preventDefault(); send(); }
+});
+inputEl.addEventListener("input", autoGrow);
+$("exportBtn").onclick = exportMd;
+$("newBtn").onclick = () => {
+  if(chat.length === 0) return;
+  if(confirm("いまの会話を消して新しくはじめる?（残したい場合は先に 📄 で保存してね。記憶の棚と日記帳はそのまま残るよ）")){
+    chat = []; save(chatKey(currentRoom.id), chat); renderChat();
+  }
+};
+
+/* ---------- 初期化 ---------- */
+renderLobby();
+</script>
+</body>
+</html>
