@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>おへや v0.6.1</title>
+<title>おへや v0.7</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -182,8 +182,34 @@
     font-size:13px;font-family:ui-monospace,Menlo,Consolas,monospace;
   }
   .msg.assistant pre{
+    position:relative;
     background:#2E2937;color:#EDE9F5;border-radius:10px;
-    padding:12px;overflow-x:auto;margin:8px 0;font-size:13px;line-height:1.6;
+    padding:34px 12px 12px;overflow-x:auto;
+    margin:8px 0;font-size:13px;line-height:1.6;
+  }
+  .copybtn{
+    position:absolute;top:6px;right:6px;
+    background:var(--surface2);color:var(--text);
+    border:1px solid var(--line);border-radius:8px;
+    padding:3px 10px;font-size:11px;cursor:pointer;
+    font-family:var(--font-body);
+  }
+  .copybtn:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+  .thought{
+    max-width:92%;align-self:flex-start;
+    margin-left:38px;
+  }
+  .thought details{
+    background:var(--surface);border:1px dashed var(--line);
+    border-radius:12px;padding:8px 12px;
+    font-size:12.5px;color:var(--muted);line-height:1.75;
+  }
+  .thought summary{
+    cursor:pointer;font-family:var(--font-display);
+    letter-spacing:.05em;user-select:none;
+  }
+  .thought .tbody{
+    margin-top:6px;white-space:pre-wrap;word-break:break-word;
   }
   .msg.assistant pre code{background:none;padding:0;color:inherit}
   .msg.assistant strong{font-weight:700}
@@ -494,6 +520,14 @@
       <p class="hint">こちらもツール機能を使うよ。ふだんの会話には最近の日記だけ渡すから、通信量にもやさしいの。</p>
     </div>
 
+    <div class="field">
+      <label class="check">
+        <input type="checkbox" id="reasoningEnabled">
+        💭 考えごとを見せてもらう（思考モデルの思考過程を表示するよ）
+      </label>
+      <p class="hint">思考に対応したモデル（Claudeの思考モード、DeepSeek R1、oシリーズなど）で使えるよ。考えてから話す分、お返事はゆっくりで料金も少し増えるの。合わないモデルでエラーが出たらオフにしてね。</p>
+    </div>
+
     <div class="section-title">わたしのこと（この子にだけ伝わるよ）</div>
     <div class="field">
       <label for="userName">この子からの呼ばれたい名前</label>
@@ -565,10 +599,11 @@
     </div>
     <div class="field" style="margin-top:16px">
       <label>データ</label>
-      <button class="btn danger" id="wipeBtn">ぜんぶ空にする</button>
+      <button class="btn" id="exportAllBtn" style="width:100%">📄 全部屋のログをまとめて保存</button>
+      <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.6.1 ─ 玄関に表札とあかり。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.7 ─ 考えごとと、まとめて保存。</p>
   </div>
 </aside>
 
@@ -616,6 +651,7 @@ for(const r of rooms){
   if(r.userNote === undefined) r.userNote = "";
   if(r.memoryEnabled === undefined) r.memoryEnabled = true;
   if(r.diaryEnabled === undefined) r.diaryEnabled = true;
+  if(r.reasoningEnabled === undefined) r.reasoningEnabled = false;
 }
 save(LS_ROOMS, rooms);
 
@@ -661,7 +697,7 @@ function renderMd(src){
   let s = esc(src);
   const blocks = [];
   s = s.replace(/```([\s\S]*?)```/g, (m, code) => {
-    blocks.push("<pre><code>" + code + "</code></pre>");
+    blocks.push('<pre><button class="copybtn" type="button">コピー</button><code>' + code + "</code></pre>");
     return "\u0000B" + (blocks.length-1) + "\u0000";
   });
   s = s.replace(/`([^`\n]+)`/g, "<code>$1</code>");
@@ -724,6 +760,49 @@ function addNote(text){
   chatEl.appendChild(div);
   scrollBottom();
 }
+function addThought(text, open){
+  const wrap = document.createElement("div");
+  wrap.className = "thought";
+  const det = document.createElement("details");
+  if(open) det.open = true;
+  const sum = document.createElement("summary");
+  sum.textContent = "💭 考えごと";
+  const body = document.createElement("div");
+  body.className = "tbody";
+  body.textContent = text;
+  det.appendChild(sum); det.appendChild(body);
+  wrap.appendChild(det);
+  chatEl.appendChild(wrap);
+  scrollBottom();
+  return wrap;
+}
+/* コードブロックのコピーボタン（クリック委譲） */
+chatEl.addEventListener("click", e => {
+  const btn = e.target.closest(".copybtn");
+  if(!btn) return;
+  const code = btn.parentElement.querySelector("code");
+  const text = code ? code.textContent : "";
+  const done = ok => {
+    btn.textContent = ok ? "コピーした！" : "できなかった…";
+    setTimeout(() => { btn.textContent = "コピー"; }, 1600);
+  };
+  const fallback = () => {
+    try{
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      done(ok);
+    }catch(err){ done(false); }
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(() => done(true), fallback);
+  }else{
+    fallback();
+  }
+});
 function addError(text){
   const div = document.createElement("div");
   div.className = "msg error";
@@ -818,7 +897,10 @@ function renderChat(){
   }
   for(const m of chat){
     if(m.role === "note") addNote(m.content);
-    else addBubble(m.role, m.content, m.usage);
+    else{
+      if(m.role === "assistant" && m.reasoning) addThought(m.reasoning, false);
+      addBubble(m.role, m.content, m.usage);
+    }
   }
 }
 
@@ -1035,6 +1117,7 @@ async function callLLM(messages, tools){
   if(tools && tools.length) body.tools = tools;
   /* Claude系はこの1行でプロンプトキャッシュが効く（長い会話の再読込が割引になる） */
   if(/^anthropic\//.test(currentRoom.model || "")) body.cache_control = { type: "ephemeral" };
+  if(currentRoom.reasoningEnabled) body.reasoning = { enabled: true };
 
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -1054,10 +1137,10 @@ async function callLLM(messages, tools){
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let buf = "";
-  let text = "", usage = null;
+  let text = "", reasoning = "", usage = null;
   const toolCalls = [];  // {id, type, function:{name, arguments}}
   let bubble = null;
-  const onText = arguments[2]; // (bubbleText) => void  … 呼び出し側でUI更新
+  const onText = arguments[2]; // (text, reasoning) => void  … 呼び出し側でUI更新
 
   while(true){
     const {done, value} = await reader.read();
@@ -1073,9 +1156,13 @@ async function callLLM(messages, tools){
       let j; try{ j = JSON.parse(data); }catch(e){ continue; }
       if(j.error) throw { jp: jpError(500, j.error.message || "") };
       const delta = j.choices?.[0]?.delta;
+      if(delta?.reasoning){
+        reasoning += delta.reasoning;
+        if(onText) onText(text, reasoning);
+      }
       if(delta?.content){
         text += delta.content;
-        if(onText) onText(text);
+        if(onText) onText(text, reasoning);
       }
       if(delta?.tool_calls){
         for(const tc of delta.tool_calls){
@@ -1089,7 +1176,7 @@ async function callLLM(messages, tools){
       if(j.usage) usage = j.usage;
     }
   }
-  return { text, usage, toolCalls: toolCalls.filter(Boolean) };
+  return { text, reasoning, usage, toolCalls: toolCalls.filter(Boolean) };
 }
 
 /* ---------- 送信 ---------- */
@@ -1134,19 +1221,30 @@ async function sendText(text){
 
   try{
     for(let round = 0; round < 5; round++){
-      let bubble = null;
-      const r = await callLLM(messages, tools, (t) => {
-        if(!bubble){
-          typing.remove();
-          bubble = addBubble("assistant", "");
+      let bubble = null, thoughtEl = null;
+      const r = await callLLM(messages, tools, (t, th) => {
+        if(th && !thoughtEl){
+          if(typing.parentNode) typing.remove();
+          thoughtEl = addThought("", true);
         }
-        bubble.innerHTML = renderMd(t);
+        if(thoughtEl && th){
+          thoughtEl.querySelector(".tbody").textContent = th;
+        }
+        if(t){
+          if(!bubble){
+            if(typing.parentNode) typing.remove();
+            bubble = addBubble("assistant", "");
+          }
+          bubble.innerHTML = renderMd(t);
+        }
         scrollBottom();
       });
       mergeUsage(r.usage);
 
       if(r.text){
-        chat.push({ role:"assistant", content:r.text, ts:Date.now() });
+        const entry = { role:"assistant", content:r.text, ts:Date.now() };
+        if(r.reasoning) entry.reasoning = r.reasoning;
+        chat.push(entry);
         save(chatKey(currentRoom.id), chat);
       }
 
@@ -1313,40 +1411,68 @@ $("diaryAskBtn").onclick = () => {
 };
 
 /* ---------- Markdown書き出し ---------- */
-function exportMd(){
-  if(!currentRoom) return;
-  if(chat.length === 0){ addError("まだ会話がないから、書き出すものがないよ。"); return; }
-  const d = new Date();
+function roomLogLines(room, chatArr){
   const pad = n => String(n).padStart(2,"0");
-  const stamp = d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
-  const meName = currentRoom.userName || "わたし";
+  const meName = room.userName || "わたし";
   const lines = [
-    "# 会話ログ：" + currentRoom.name,
+    "# 会話ログ：" + room.name,
     "",
-    "- 日付: " + stamp,
-    "- モデル: " + (currentRoom.modelName || currentRoom.model || "未設定"),
+    "- モデル: " + (room.modelName || room.model || "未設定"),
     "",
     "---",
     ""
   ];
-  for(const m of chat){
+  for(const m of chatArr){
     const t = new Date(m.ts);
     const time = pad(t.getHours()) + ":" + pad(t.getMinutes());
     if(m.role === "note"){
       lines.push("> " + m.content, "");
       continue;
     }
+    if(m.role !== "user" && m.role !== "assistant") continue;
     const who = m.role === "user"
       ? "🧑 " + meName
-      : (currentRoom.emoji || "🤖") + " " + currentRoom.name;
+      : (room.emoji || "🤖") + " " + room.name;
     lines.push("## " + who + "（" + time + "）", "", m.content, "");
   }
-  const blob = new Blob([lines.join("\n")], {type:"text/markdown;charset=utf-8"});
+  return lines;
+}
+function downloadText(filename, text, mime){
+  const blob = new Blob([text], {type:(mime || "text/markdown") + ";charset=utf-8"});
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = currentRoom.name + "_log_" + stamp + "_" + pad(d.getHours()) + pad(d.getMinutes()) + ".md";
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+function exportMd(){
+  if(!currentRoom) return;
+  if(chat.length === 0){ addError("まだ会話がないから、書き出すものがないよ。"); return; }
+  const d = new Date();
+  const pad = n => String(n).padStart(2,"0");
+  const stamp = d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
+  const lines = ["<!-- 日付: " + stamp + " -->", ""].concat(roomLogLines(currentRoom, chat));
+  downloadText(currentRoom.name + "_log_" + stamp + "_" + pad(d.getHours()) + pad(d.getMinutes()) + ".md", lines.join("\n"));
+}
+function exportAllMd(){
+  if(rooms.length === 0){ backupMsg("まだ部屋がないから、書き出すものがないよ。"); return; }
+  const d = new Date();
+  const pad = n => String(n).padStart(2,"0");
+  const stamp = d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
+  let lines = ["# おへや 全部屋の会話ログ", "", "- 保存日: " + stamp, "- 部屋の数: " + rooms.length, ""];
+  let count = 0;
+  for(const r of rooms){
+    const c = load(chatKey(r.id)) || [];
+    lines.push("", "---", "");
+    if(c.length === 0){
+      lines.push("# 会話ログ：" + r.name, "", "（まだ会話がないよ）", "");
+      continue;
+    }
+    lines = lines.concat(roomLogLines(r, c));
+    count++;
+  }
+  downloadText("oheya_all_logs_" + stamp + "_" + pad(d.getHours()) + pad(d.getMinutes()) + ".md", lines.join("\n"));
+  backupMsg("全部屋のログを書き出したよ（会話のある部屋: " + count + "）。");
 }
 
 /* ---------- プロフィール ---------- */
@@ -1360,6 +1486,7 @@ function openProfile(){
   $("userNote").value = currentRoom.userNote || "";
   $("memoryEnabled").checked = !!currentRoom.memoryEnabled;
   $("diaryEnabled").checked = !!currentRoom.diaryEnabled;
+  $("reasoningEnabled").checked = !!currentRoom.reasoningEnabled;
   $("modelSearch").value = "";
   $("modelList").classList.remove("show");
   pendingModel = currentRoom.model
@@ -1412,6 +1539,7 @@ $("saveProfileBtn").onclick = () => {
   currentRoom.userNote = $("userNote").value;
   currentRoom.memoryEnabled = $("memoryEnabled").checked;
   currentRoom.diaryEnabled = $("diaryEnabled").checked;
+  currentRoom.reasoningEnabled = $("reasoningEnabled").checked;
   if(pendingModel){ currentRoom.model = pendingModel.id; currentRoom.modelName = pendingModel.name; }
   save(LS_ROOMS, rooms);
 
@@ -1546,6 +1674,7 @@ async function checkCredits(){
   }catch(e){ box.textContent = jpError(0); }
 }
 $("checkCredits").onclick = checkCredits;
+$("exportAllBtn").onclick = exportAllMd;
 
 /* ---------- バックアップ ---------- */
 function makeBackup(){
@@ -1622,7 +1751,7 @@ $("addRoomBtn").onclick = () => {
   const r = {
     id: uid(), name: name.trim(), emoji: "🚪",
     model:"", modelName:"", sysPrompt:"",
-    userName:"", userNote:"", memoryEnabled:true, diaryEnabled:true,
+    userName:"", userNote:"", memoryEnabled:true, diaryEnabled:true, reasoningEnabled:false,
     createdAt: Date.now()
   };
   rooms.push(r);
