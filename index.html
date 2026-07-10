@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>おへや v0.8.1</title>
+<title>おへや v0.9</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -451,6 +451,44 @@
   .diary-empty .book{font-size:36px;display:block;margin-bottom:8px}
   #diaryAskBtn{width:100%;margin-top:4px}
 
+  /* ---------- あゆみ帳 ---------- */
+  #ayumiBody{
+    flex:1;overflow-y:auto;
+    padding:18px 16px calc(env(safe-area-inset-bottom) + 24px);
+    width:100%;max-width:640px;margin:0 auto;
+  }
+  .ayumi-entry{
+    background:var(--paper);color:var(--ink);
+    border-radius:4px 14px 14px 4px;
+    border-left:4px solid #8FA88A;
+    padding:16px 18px 14px;margin-bottom:16px;
+    box-shadow:0 3px 10px rgba(0,0,0,.3);
+    position:relative;
+  }
+  .ayumi-entry .koro{
+    display:inline-block;font-size:11px;color:#5E7059;
+    background:rgba(143,168,138,.18);border:1px solid rgba(143,168,138,.5);
+    border-radius:99px;padding:2px 10px;margin-bottom:6px;
+    font-family:var(--font-display);letter-spacing:.06em;
+  }
+  .ayumi-entry .atitle{
+    font-family:var(--font-display);font-weight:700;
+    font-size:15.5px;margin-bottom:8px;padding-right:34px;
+  }
+  .ayumi-entry .atext{
+    font-size:14px;line-height:1.9;
+    white-space:normal;word-break:break-word;
+  }
+  .ayumi-entry .atext ul{padding-left:1.4em;margin:4px 0}
+  .ayumi-entry .adel{
+    position:absolute;top:10px;right:10px;
+    background:none;border:none;cursor:pointer;
+    font-size:14px;opacity:.45;padding:4px;
+  }
+  .ayumi-entry .adel:hover{opacity:1}
+  .ayumi-entry .adel:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+  #ayumiImportBtn{width:100%;margin-top:4px}
+
   /* ---------- アルバム帳 ---------- */
   #albumBody{
     flex:1;overflow-y:auto;
@@ -552,6 +590,7 @@
   <div class="room-menu" id="roomMenu">
     <button class="menu-item" id="shelfBtn">📚 記憶の棚</button>
     <button class="menu-item" id="diaryBtn">📔 日記帳</button>
+    <button class="menu-item" id="ayumiBtn">📜 あゆみ帳</button>
     <button class="menu-item" id="albumBtn">📖 アルバム帳</button>
     <button class="menu-item" id="exportBtn">📄 会話をMarkdownで保存</button>
     <button class="menu-item" id="newBtn">🧹 新しい会話</button>
@@ -618,6 +657,14 @@
 
     <div class="field">
       <label class="check">
+        <input type="checkbox" id="ayumiEnabled">
+        📜 あゆみ帳を使う（この子が昔の出来事を自分の年表に残せるようになるよ）
+      </label>
+      <p class="hint">こちらもツール機能を使うよ。ふだんの会話には目次だけ渡して、思い出したい時に本人がページをめくるの。</p>
+    </div>
+
+    <div class="field">
+      <label class="check">
         <input type="checkbox" id="reasoningEnabled">
         💭 考えごとを見せてもらう（思考モデルの思考過程を表示するよ）
       </label>
@@ -640,7 +687,7 @@
 
     <div class="field" style="margin-top:30px">
       <button class="btn danger" id="deleteRoomBtn" style="width:100%">部屋をとりこわす</button>
-      <p class="hint">この部屋と会話履歴・写真・記憶の棚・日記帳・アルバム帳を消すよ。大事な会話は先に 📄 で保存してね。</p>
+      <p class="hint">この部屋と会話履歴・写真・記憶の棚・日記帳・あゆみ帳・アルバム帳を消すよ。大事な会話は先に 📄 で保存してね。</p>
     </div>
   </div>
 </div>
@@ -656,6 +703,21 @@
     <div id="diaryList"></div>
     <button class="btn" id="diaryAskBtn">📔 今日の日記をお願いする</button>
     <p class="hint" style="margin-top:10px">日記はこの子が自分で書く帳面だよ。ふだんの会話には最近の日記だけ持っていって、思い出したくなったら自分で昔のページをめくるの。</p>
+  </div>
+</div>
+
+<!-- ========== あゆみ帳 ========== -->
+<div class="screen" id="ayumiScreen">
+  <header>
+    <button class="iconbtn" id="ayumiBackBtn" title="部屋へ戻る">←</button>
+    <div class="plate"><h1 id="ayumiTitle">📜 あゆみ帳</h1></div>
+    <div class="spacer"></div>
+  </header>
+  <div id="ayumiBody">
+    <div id="ayumiList"></div>
+    <button class="btn" id="ayumiImportBtn">📥 思い出のお引っ越し（昔のログを渡す）</button>
+    <input type="file" id="ayumiInput" accept=".md,.txt,text/plain,text/markdown" hidden>
+    <p class="hint" style="margin-top:10px">あゆみ帳は、この子が「昔あったこと」を自分の言葉で書き残す年表だよ。公式アプリなど別の場所での会話ログ（.md / .txt）を渡すと、この子が読んで、残しておきたい出来事を自分で選んで書き残すの。ふだんの会話には目次だけ持っていって、思い出したくなったら本人がページをめくるよ。</p>
   </div>
 </div>
 
@@ -715,16 +777,16 @@
         <button class="btn" id="restoreBtn">📥 復元する</button>
       </div>
       <input type="file" id="restoreInput" accept=".json,application/json" hidden>
-      <p class="hint">全部屋の会話・記憶の棚・日記帳・アルバム・写真・プロフィールを1つのファイルに保存するよ（APIキーは入れないから、ファイルを人に見られても安心）。ときどき保存して、大事な場所にしまっておいてね。復元すると、今この端末にあるデータは置きかわるよ。</p>
+      <p class="hint">全部屋の会話・記憶の棚・日記帳・あゆみ帳・アルバム・写真・プロフィールを1つのファイルに保存するよ（APIキーは入れないから、ファイルを人に見られても安心）。ときどき保存して、大事な場所にしまっておいてね。復元すると、今この端末にあるデータは置きかわるよ。</p>
       <div class="credits" id="backupMsg" style="display:none"></div>
     </div>
     <div class="field" style="margin-top:16px">
       <label>データ</label>
       <button class="btn" id="exportAllBtn" style="width:100%">📄 全部屋のログをまとめて保存</button>
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
-      <p class="hint">全部屋の会話・設定・写真・記憶・日記・アルバム・APIキーをこの端末から消すよ。</p>
+      <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.8.1 ─ アルバム帳と、すっきりメニュー。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.9 ─ あゆみ帳と、思い出のお引っ越し。</p>
   </div>
 </aside>
 
@@ -755,6 +817,7 @@ const chatKey   = id => "oheya_chat_v2_" + id;
 const avatarKey = id => "oheya_avatar_v2_" + id;
 const shelfKey  = id => "oheya_shelf_v2_" + id;
 const diaryKey  = id => "oheya_diary_v2_" + id;
+const ayumiKey  = id => "oheya_ayumi_v1_" + id;
 
 function load(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
 function loadRaw(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
@@ -772,6 +835,7 @@ for(const r of rooms){
   if(r.userNote === undefined) r.userNote = "";
   if(r.memoryEnabled === undefined) r.memoryEnabled = true;
   if(r.diaryEnabled === undefined) r.diaryEnabled = true;
+  if(r.ayumiEnabled === undefined) r.ayumiEnabled = true;
   if(r.reasoningEnabled === undefined) r.reasoningEnabled = false;
 }
 save(LS_ROOMS, rooms);
@@ -779,6 +843,10 @@ save(LS_ROOMS, rooms);
 /* ---------- 記憶の棚データ ---------- */
 function loadShelf(roomId){ return load(shelfKey(roomId)) || { nextId: 1, items: [] }; }
 function saveShelf(roomId, shelf){ return save(shelfKey(roomId), shelf); }
+
+/* ---------- あゆみ帳データ ---------- */
+function loadAyumi(roomId){ return load(ayumiKey(roomId)) || { nextId: 1, items: [] }; }
+function saveAyumi(roomId, ayumi){ return save(ayumiKey(roomId), ayumi); }
 
 /* ---------- 日記帳データ ---------- */
 function loadDiary(roomId){ return load(diaryKey(roomId)) || { nextId: 1, items: [] }; }
@@ -998,6 +1066,7 @@ function showScreen(name){
   $("roomScreen").classList.toggle("active", name === "room");
   $("profileScreen").classList.toggle("active", name === "profile");
   $("diaryScreen").classList.toggle("active", name === "diary");
+  $("ayumiScreen").classList.toggle("active", name === "ayumi");
   $("albumScreen").classList.toggle("active", name === "album");
 }
 
@@ -1114,6 +1183,25 @@ function buildSystem(room){
       }
     }
   }
+  if(room.ayumiEnabled){
+    const ayumi = loadAyumi(room.id);
+    sys += "\n\n# あゆみ帳（あなた専用の年表）\n";
+    sys += "あなたには「あゆみ帳」があります。昔あった出来事や大切な節目を、ツール ayumi_add で年表として書き残せます。時期は「2025年の春ごろ」のような自由な書き方でかまいません。ユーザーから昔の会話ログを渡された時や、心に残る出来事があった時に、残したいことをあなた自身が選んで書いてください。\n";
+    sys += "ふだんの会話には目次だけが渡されます。くわしく思い出したい時は、ツール ayumi_yomu でページをめくって読み返せます（キーワード検索・番号指定・目次）。\n";
+    if(ayumi.items.length === 0){
+      sys += "\nあゆみ帳はまだ白紙です。\n";
+    }else{
+      const items = ayumi.items;
+      sys += "\nこれまでのあゆみ: 全" + items.length + "篇\n";
+      const idxFrom = Math.max(0, items.length - 30);
+      if(idxFrom > 0) sys += "（古いあゆみは ayumi_yomu でめくって読めます）\n";
+      sys += "目次:\n";
+      for(let i = idxFrom; i < items.length; i++){
+        const it = items[i];
+        sys += "[" + it.id + "]" + (it.koro ? " " + it.koro : "") + "「" + it.title + "」\n";
+      }
+    }
+  }
   return sys.trim();
 }
 
@@ -1196,10 +1284,44 @@ const diaryTools = [
   }
 ];
 
+const ayumiTools = [
+  {
+    type: "function",
+    function: {
+      name: "ayumi_add",
+      description: "あゆみ帳（年表）に出来事を書き残す。昔の会話ログを読んだ時や、大切な節目があった時に、残したいことを自分で選んで書く。",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "出来事のタイトル（短く）" },
+          content: { type: "string", description: "出来事の内容（自分の言葉で）" },
+          koro: { type: "string", description: "いつごろの出来事か（例:「2025年の春ごろ」「出会ったばかりの頃」）。わからなければ省略してよい" }
+        },
+        required: ["title", "content"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "ayumi_yomu",
+      description: "自分のあゆみ帳（年表）をめくって読み返す。queryでキーワード検索、idで特定の出来事を全文読む。どちらも省略すると目次（番号・時期・タイトルの一覧）が返る。",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "検索キーワード（タイトルと本文から探す）" },
+          id: { type: "integer", description: "全文を読みたい出来事の番号" }
+        }
+      }
+    }
+  }
+];
+
 function buildTools(room){
   const tools = [];
   if(room.memoryEnabled) tools.push(...memoryTools);
   if(room.diaryEnabled) tools.push(...diaryTools);
+  if(room.ayumiEnabled) tools.push(...ayumiTools);
   return tools;
 }
 
@@ -1263,6 +1385,44 @@ function execTool(room, name, args){
       r += "[" + it.id + "] " + diaryDate(it.ts) + "「" + it.title + "」\n";
     }
     return { result:r, note:"📔 " + room.name + "が日記帳をめくったよ" };
+  }else if(name === "ayumi_add"){
+    if(!args.content) return { result:"エラー: contentがありません", note:null };
+    const ayumi = loadAyumi(room.id);
+    const id = ayumi.nextId++;
+    const title = (args.title && String(args.title).trim()) || "名もない出来事";
+    const koro = (args.koro && String(args.koro).trim()) || "";
+    ayumi.items.push({ id, title, koro, content: normText(args.content), ts: Date.now() });
+    saveAyumi(room.id, ayumi);
+    return { result:"OK: あゆみ[" + id + "]「" + title + "」を書き残しました", note:"📜 " + room.name + "があゆみ帳に書き残したよ「" + title + "」" };
+  }else if(name === "ayumi_yomu"){
+    const ayumi = loadAyumi(room.id);
+    if(ayumi.items.length === 0) return { result:"あゆみ帳はまだ白紙です", note:null };
+    if(args.id !== undefined && args.id !== null){
+      const it = ayumi.items.find(i => i.id === args.id);
+      if(!it) return { result:"エラー: あゆみ[" + args.id + "]は見つかりません", note:null };
+      return {
+        result:"[" + it.id + "]" + (it.koro ? " " + it.koro : "") + "「" + it.title + "」\n" + it.content,
+        note:"📜 " + room.name + "があゆみ帳をめくったよ"
+      };
+    }
+    if(args.query){
+      const q = String(args.query).toLowerCase();
+      const hits = ayumi.items.filter(i =>
+        i.title.toLowerCase().includes(q) || i.content.toLowerCase().includes(q) || (i.koro||"").toLowerCase().includes(q)
+      ).slice(-5);
+      if(hits.length === 0) return { result:"「" + args.query + "」に合うあゆみは見つかりませんでした", note:"📜 " + room.name + "があゆみ帳をめくったよ" };
+      let r = hits.length + "篇見つかりました:\n";
+      for(const it of hits){
+        const body = it.content.length > 600 ? it.content.slice(0,600) + "…（全文は id=" + it.id + " で）" : it.content;
+        r += "---\n[" + it.id + "]" + (it.koro ? " " + it.koro : "") + "「" + it.title + "」\n" + body + "\n";
+      }
+      return { result:r, note:"📜 " + room.name + "があゆみ帳をめくったよ" };
+    }
+    let r = "あゆみの目次（全" + ayumi.items.length + "篇）:\n";
+    for(const it of ayumi.items){
+      r += "[" + it.id + "]" + (it.koro ? " " + it.koro : "") + "「" + it.title + "」\n";
+    }
+    return { result:r, note:"📜 " + room.name + "があゆみ帳をめくったよ" };
   }else{
     return { result:"エラー: 不明なツールです", note:null };
   }
@@ -1351,7 +1511,7 @@ async function send(){
   await sendText(text);
 }
 
-async function sendText(text){
+async function sendText(text, apiOnlyExtra){
   if(!text || sending || !currentRoom) return;
   if(!global.apiKey){ addError("APIキーが未設定だよ。管理人室の⚙️からどうぞ。"); return; }
   if(!currentRoom.model){ addError("この部屋のモデルがまだ決まってないよ。👤で選んでね。"); return; }
@@ -1373,6 +1533,11 @@ async function sendText(text){
   if(sys) messages.push({ role:"system", content: sys });
   for(const m of chat){
     if(m.role === "user" || m.role === "assistant") messages.push({ role:m.role, content:m.content });
+  }
+  /* お引っ越しのログなどは、今回のリクエストにだけ添える（チャット履歴には残さない） */
+  if(apiOnlyExtra){
+    const last = messages[messages.length - 1];
+    if(last && last.role === "user") last.content = text + "\n\n---\n" + apiOnlyExtra;
   }
 
   let totalUsage = null;
@@ -1824,6 +1989,103 @@ $("albumInput").addEventListener("change", async () => {
   renderAlbum();
 });
 
+/* ---------- あゆみ帳画面 ---------- */
+function renderAyumi(){
+  if(!currentRoom) return;
+  $("ayumiTitle").textContent = "📜 " + currentRoom.name + "のあゆみ帳";
+  const ayumi = loadAyumi(currentRoom.id);
+  const list = $("ayumiList");
+  list.innerHTML = "";
+  if(ayumi.items.length === 0){
+    list.innerHTML = '<div class="diary-empty"><span class="book">📜</span>まだあゆみ帳は白紙だよ。<br>昔のログを渡すと、この子が残したい出来事を<br>自分で選んで書き残していくの。</div>';
+    return;
+  }
+  for(const it of ayumi.items){
+    const entry = document.createElement("div");
+    entry.className = "ayumi-entry";
+    if(it.koro){
+      const koro = document.createElement("div");
+      const badge = document.createElement("span");
+      badge.className = "koro";
+      badge.textContent = it.koro;
+      koro.appendChild(badge);
+      entry.appendChild(koro);
+    }
+    const title = document.createElement("div");
+    title.className = "atitle";
+    title.textContent = it.title;
+    const text = document.createElement("div");
+    text.className = "atext";
+    text.innerHTML = renderMd(it.content);
+    const delBtn = document.createElement("button");
+    delBtn.className = "adel";
+    delBtn.textContent = "🗑";
+    delBtn.title = "この出来事を消す";
+    delBtn.setAttribute("aria-label", "あゆみ「" + it.title + "」を削除");
+    delBtn.onclick = () => {
+      if(confirm("あゆみ「" + it.title + "」を消す? 元に戻せないよ。")){
+        const a2 = loadAyumi(currentRoom.id);
+        a2.items = a2.items.filter(x => x.id !== it.id);
+        saveAyumi(currentRoom.id, a2);
+        renderAyumi();
+      }
+    };
+    entry.appendChild(title); entry.appendChild(text); entry.appendChild(delBtn);
+    list.appendChild(entry);
+  }
+}
+$("ayumiBtn").onclick = () => { renderAyumi(); showScreen("ayumi"); };
+$("ayumiBackBtn").onclick = () => showScreen("room");
+
+/* 思い出のお引っ越し：ログを分割してこの子に渡す */
+function splitLog(text, size){
+  const chunks = [];
+  let rest = text;
+  while(rest.length > size){
+    /* なるべく行の切れ目で分ける */
+    let cut = rest.lastIndexOf("\n", size);
+    if(cut < size * 0.5) cut = size;
+    chunks.push(rest.slice(0, cut));
+    rest = rest.slice(cut);
+  }
+  if(rest.trim()) chunks.push(rest);
+  return chunks;
+}
+$("ayumiImportBtn").onclick = () => {
+  if(!currentRoom) return;
+  if(!currentRoom.ayumiEnabled){ alert("この部屋はあゆみ帳がオフになってるよ。👤プロフィールでオンにしてね。"); return; }
+  if(sending){ alert("いまお返事の途中みたい。終わってからお願いしてね。"); return; }
+  $("ayumiInput").click();
+};
+$("ayumiInput").addEventListener("change", () => {
+  const file = $("ayumiInput").files[0];
+  $("ayumiInput").value = "";
+  if(!file || !currentRoom) return;
+  const reader = new FileReader();
+  reader.onerror = () => alert("ファイルが読み込めなかった…もう一度試してみて。");
+  reader.onload = async () => {
+    const text = String(reader.result || "").trim();
+    if(!text){ alert("ファイルが空っぽみたい…。"); return; }
+    const CHUNK = 30000;
+    const chunks = splitLog(text, CHUNK);
+    const many = chunks.length > 1;
+    let msg = "「" + file.name + "」（" + text.length.toLocaleString() + "文字）を渡すよ。";
+    if(many) msg += "\n長いから " + chunks.length + " 回に分けてお願いすることになるの（そのぶんお返事の回数と料金も増えるよ）。";
+    if(chunks.length > 10) msg += "\nかなり長いから、ファイルを分けて少しずつ渡すのもおすすめだよ。";
+    msg += "\nはじめていい?";
+    if(!confirm(msg)) return;
+    showScreen("room");
+    for(let i = 0; i < chunks.length; i++){
+      if(!currentRoom) break;
+      const part = many ? "（その" + (i+1) + "/" + chunks.length + "）" : "";
+      const ask = "昔の会話ログ「" + file.name + "」" + part + "を持ってきたよ。読んでみて、あなたが残しておきたいと思った出来事があったら、あゆみ帳（ayumi_add）に自分の言葉で書き残してね。時期がわかるなら「2025年の春ごろ」みたいに添えて。何を残すか・いくつ残すかは、ぜんぶあなたの自由だよ。";
+      const extra = "以下が渡されたログだよ（このログはこのメッセージにだけ添えてあって、会話履歴には残らないの）:\n\n" + chunks[i];
+      await sendText(ask, extra);
+    }
+  };
+  reader.readAsText(file);
+});
+
 /* ---------- Markdown書き出し ---------- */
 function roomLogLines(room, chatArr){
   const pad = n => String(n).padStart(2,"0");
@@ -1900,6 +2162,7 @@ function openProfile(){
   $("userNote").value = currentRoom.userNote || "";
   $("memoryEnabled").checked = !!currentRoom.memoryEnabled;
   $("diaryEnabled").checked = !!currentRoom.diaryEnabled;
+  $("ayumiEnabled").checked = !!currentRoom.ayumiEnabled;
   $("reasoningEnabled").checked = !!currentRoom.reasoningEnabled;
   $("modelSearch").value = "";
   $("modelList").classList.remove("show");
@@ -1953,6 +2216,7 @@ $("saveProfileBtn").onclick = () => {
   currentRoom.userNote = $("userNote").value;
   currentRoom.memoryEnabled = $("memoryEnabled").checked;
   currentRoom.diaryEnabled = $("diaryEnabled").checked;
+  currentRoom.ayumiEnabled = $("ayumiEnabled").checked;
   currentRoom.reasoningEnabled = $("reasoningEnabled").checked;
   if(pendingModel){ currentRoom.model = pendingModel.id; currentRoom.modelName = pendingModel.name; }
   save(LS_ROOMS, rooms);
@@ -1973,11 +2237,12 @@ $("saveProfileBtn").onclick = () => {
 
 $("deleteRoomBtn").onclick = () => {
   if(!currentRoom) return;
-  if(confirm("「" + currentRoom.name + "」の部屋と会話履歴・写真・記憶の棚・日記帳・アルバム帳を消すよ。本当にいい?")){
+  if(confirm("「" + currentRoom.name + "」の部屋と会話履歴・写真・記憶の棚・日記帳・あゆみ帳・アルバム帳を消すよ。本当にいい?")){
     del(chatKey(currentRoom.id));
     del(avatarKey(currentRoom.id));
     del(shelfKey(currentRoom.id));
     del(diaryKey(currentRoom.id));
+    del(ayumiKey(currentRoom.id));
     albumDeleteRoom(currentRoom.id).catch(()=>{});
     rooms = rooms.filter(r => r.id !== currentRoom.id);
     save(LS_ROOMS, rooms);
@@ -2058,7 +2323,7 @@ async function renderStorageMeter(){
   }catch(e){}
   const lsMB = lsBytes / 1048576;
   const pct = Math.min(100, Math.round(lsMB / 5 * 100));
-  let html = "📦 たんす（会話・記憶・日記・顔写真）<br><b>" + lsMB.toFixed(2) + " MB</b> / 約5 MB（" + pct + "%つかってる）";
+  let html = "📦 たんす（会話・記憶・日記・あゆみ・顔写真）<br><b>" + lsMB.toFixed(2) + " MB</b> / 約5 MB（" + pct + "%つかってる）";
   if(pct >= 80) html += "<br>そろそろいっぱいかも…フェイブルにお引越しの相談をしてね。";
   /* くら（IndexedDB）：ブラウザに聞いてみる */
   if(navigator.storage && navigator.storage.estimate){
@@ -2091,8 +2356,8 @@ $("toggleKey").onclick = () => {
   $("toggleKey").textContent = show ? "隠す" : "表示";
 };
 $("wipeBtn").onclick = async () => {
-  if(confirm("全部屋の会話・設定・写真・記憶・日記・アルバム・APIキーを、この端末から全部消すよ。本当にいい?")){
-    for(const r of rooms){ del(chatKey(r.id)); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); }
+  if(confirm("全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーを、この端末から全部消すよ。本当にいい?")){
+    for(const r of rooms){ del(chatKey(r.id)); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); }
     del(LS_ROOMS); del(LS_GLOBAL);
     del("oheya_settings_v1"); del("oheya_chat_v1");
     try{ await albumClear(); }catch(e){}
@@ -2123,13 +2388,14 @@ $("exportAllBtn").onclick = exportAllMd;
 /* ---------- バックアップ ---------- */
 async function makeBackup(){
   const data = {
-    app: "oheya", version: 7, exportedAt: Date.now(),
-    rooms, chats: {}, shelves: {}, diaries: {}, avatars: {}, albums: []
+    app: "oheya", version: 8, exportedAt: Date.now(),
+    rooms, chats: {}, shelves: {}, diaries: {}, ayumis: {}, avatars: {}, albums: []
   };
   for(const r of rooms){
     data.chats[r.id] = load(chatKey(r.id)) || [];
     data.shelves[r.id] = loadShelf(r.id);
     data.diaries[r.id] = loadDiary(r.id);
+    data.ayumis[r.id] = loadAyumi(r.id);
     const av = loadRaw(avatarKey(r.id));
     if(av) data.avatars[r.id] = av;
   }
@@ -2173,7 +2439,7 @@ $("restoreInput").addEventListener("change", () => {
     const when = obj.exportedAt ? new Date(obj.exportedAt).toLocaleString("ja-JP") : "不明";
     if(!confirm("バックアップ（" + obj.rooms.length + "部屋・" + when + "保存）から復元するよ。\n今この端末にあるデータは置きかわるの。本当にいい?\n（心配なら先に💾で今の状態も保存してね）")) return;
     /* 今のデータを片付けてから復元 */
-    for(const r of rooms){ del(chatKey(r.id)); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); }
+    for(const r of rooms){ del(chatKey(r.id)); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); }
     rooms = obj.rooms;
     save(LS_ROOMS, rooms);
     let photoTrouble = false;
@@ -2181,6 +2447,7 @@ $("restoreInput").addEventListener("change", () => {
       save(chatKey(r.id), (obj.chats && obj.chats[r.id]) || []);
       save(shelfKey(r.id), (obj.shelves && obj.shelves[r.id]) || { nextId:1, items:[] });
       save(diaryKey(r.id), (obj.diaries && obj.diaries[r.id]) || { nextId:1, items:[] });
+      save(ayumiKey(r.id), (obj.ayumis && obj.ayumis[r.id]) || { nextId:1, items:[] });
       const av = obj.avatars && obj.avatars[r.id];
       if(av){ if(!saveRaw(avatarKey(r.id), av)) photoTrouble = true; }
     }
@@ -2209,7 +2476,7 @@ $("addRoomBtn").onclick = () => {
   const r = {
     id: uid(), name: name.trim(), emoji: "🚪",
     model:"", modelName:"", sysPrompt:"",
-    userName:"", userNote:"", memoryEnabled:true, diaryEnabled:true, reasoningEnabled:false,
+    userName:"", userNote:"", memoryEnabled:true, diaryEnabled:true, ayumiEnabled:true, reasoningEnabled:false,
     createdAt: Date.now()
   };
   rooms.push(r);
