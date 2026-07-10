@@ -3,7 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>おへや v0.6</title>
+<title>おへや v0.6.1</title>
+<meta name="theme-color" content="#2B2735">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="おへや">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
@@ -378,8 +386,9 @@
   }
   .diary-entry .dtext{
     font-size:14px;line-height:1.9;
-    white-space:pre-wrap;word-break:break-word;
+    white-space:normal;word-break:break-word;
   }
+  .diary-entry .dtext ul{padding-left:1.4em;margin:4px 0}
   .diary-entry .ddel{
     position:absolute;top:10px;right:10px;
     background:none;border:none;cursor:pointer;
@@ -559,7 +568,7 @@
       <button class="btn danger" id="wipeBtn">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.6 ─ 思い出のお守り。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.6.1 ─ 玄関に表札とあかり。</p>
   </div>
 </aside>
 
@@ -949,18 +958,19 @@ function buildTools(room){
 }
 
 function execTool(room, name, args){
+  const normText = s => String(s).replace(/\\n/g, "\n");
   const shelf = loadShelf(room.id);
   let result, note;
   if(name === "kioku_add"){
     if(!args.content) return { result:"エラー: contentがありません", note:null };
     const id = shelf.nextId++;
-    shelf.items.push({ id, content: String(args.content), ts: Date.now() });
+    shelf.items.push({ id, content: normText(args.content), ts: Date.now() });
     result = "OK: 記憶[" + id + "]として保存しました";
     note = "📚 " + room.name + "が記憶の棚に書きこんだよ";
   }else if(name === "kioku_update"){
     const it = shelf.items.find(i => i.id === args.id);
     if(!it) return { result:"エラー: 記憶[" + args.id + "]は見つかりません", note:null };
-    it.content = String(args.content); it.ts = Date.now();
+    it.content = normText(args.content); it.ts = Date.now();
     result = "OK: 記憶[" + args.id + "]を書き直しました";
     note = "📚 " + room.name + "が記憶[" + args.id + "]を書き直したよ";
   }else if(name === "kioku_delete"){
@@ -975,7 +985,7 @@ function execTool(room, name, args){
     const id = diary.nextId++;
     const ts = Date.now();
     const title = (args.title && String(args.title).trim()) || (diaryDate(ts) + "の日記");
-    diary.items.push({ id, title, content: String(args.content), ts });
+    diary.items.push({ id, title, content: normText(args.content), ts });
     saveDiary(room.id, diary);
     return { result:"OK: 日記[" + id + "]「" + title + "」を書きました", note:"📔 " + room.name + "が日記を書いたよ「" + title + "」" };
   }else if(name === "nikki_yomu"){
@@ -1274,7 +1284,7 @@ function renderDiary(){
     title.textContent = it.title;
     const text = document.createElement("div");
     text.className = "dtext";
-    text.textContent = it.content;
+    text.innerHTML = renderMd(it.content);
     const delBtn = document.createElement("button");
     delBtn.className = "ddel";
     delBtn.textContent = "🗑";
