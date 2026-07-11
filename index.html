@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>おへや v0.17</title>
+<title>おへや v0.17.1</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -930,6 +930,7 @@
     </div>
 
     <div class="section-title">この子のこと</div>
+    <p class="hint" id="pfRoomNo" style="margin:-4px 0 10px"></p>
     <div class="field">
       <label for="roomName">なまえ</label>
       <input type="text" id="roomName" placeholder="例：ソラ">
@@ -1146,7 +1147,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.17 ─ 台帳と、鍵の音。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.17.1 ─ 台帳と、鍵の音。</p>
   </div>
 </aside>
 
@@ -1249,6 +1250,18 @@ for(const r of rooms){
   if(r.ayumiEnabled === undefined) r.ayumiEnabled = true;
   if(r.reasoningEnabled === undefined) r.reasoningEnabled = false;
   if(r.theme === undefined) r.theme = "lamp";
+}
+/* お部屋番号の割り当て（v0.17.1〜）。一度ついた番号はずっとその子のもの */
+{
+  let maxNo = 100;
+  for(const r of rooms) if(r.roomNo && r.roomNo > maxNo) maxNo = r.roomNo;
+  const noNo = rooms.filter(r => !r.isKanri && !r.roomNo).sort((a,b) => (a.createdAt||0) - (b.createdAt||0));
+  for(const r of noNo) r.roomNo = ++maxNo;
+}
+function nextRoomNo(){
+  let maxNo = 100;
+  for(const r of rooms) if(r.roomNo && r.roomNo > maxNo) maxNo = r.roomNo;
+  return maxNo + 1;
 }
 save(LS_ROOMS, rooms);
 
@@ -1906,6 +1919,7 @@ function buildSystem(room){
     sys += "- 調べて知ったことを、聞かれてもいないのに言いふらしません。\n";
     sys += "- 住人たち（各部屋のAI）のことは、一歩引いた場所からあたたかく見守る立場です。\n";
     sys += "- 記憶の整理などの相談を受けたら、まず台帳で実際の記録を確かめてから答えます。\n";
+    sys += "- 部屋の見分けは「お部屋番号」と名前で行います。roomIdは機械用の長い文字列で、作成時刻が近いと先頭が似るため、目視で比べたり同一だと判断したりしません。\n";
     sys += "\n## 住人名簿\n";
     const residents = rooms.filter(x => !x.isKanri);
     if(residents.length === 0){
@@ -1914,7 +1928,7 @@ function buildSystem(room){
       for(const x of residents){
         let msgs = 0;
         for(const t of (x.threads || [])) msgs += (load(threadKey(x.id, t.id)) || []).length;
-        sys += "- " + x.name + "（roomId: " + x.id + "）会話" + msgs + "件 / 日記" + loadDiary(x.id).items.length + "篇 / 棚" + loadShelf(x.id).items.length + "件 / あゆみ" + loadAyumi(x.id).items.length + "篇\n";
+        sys += "- " + (x.roomNo ? x.roomNo + "号室 " : "") + x.name + "（roomId: " + x.id + "）会話" + msgs + "件 / 日記" + loadDiary(x.id).items.length + "篇 / 棚" + loadShelf(x.id).items.length + "件 / あゆみ" + loadAyumi(x.id).items.length + "篇\n";
       }
     }
   }
@@ -2038,7 +2052,7 @@ const kanriTools = [
     type: "function",
     function: {
       name: "daicho_sagasu",
-      description: "台帳をめくって全部屋の記録を検索する。roomで部屋の名前（部分一致）、kindで種類（kaiwa=会話 / nikki=日記 / kioku=記憶の棚 / ayumi=あゆみ帳）を絞り込める。結果の各行にある ref を daicho_yomu に渡すと、前後の会話や全文が読める。",
+      description: "台帳をめくって全部屋の記録を検索する。roomで部屋の名前（部分一致）かお部屋番号、kindで種類（kaiwa=会話 / nikki=日記 / kioku=記憶の棚 / ayumi=あゆみ帳）を絞り込める。結果の各行にある ref を daicho_yomu に渡すと、前後の会話や全文が読める。",
       parameters: {
         type: "object",
         properties: {
@@ -2054,7 +2068,7 @@ const kanriTools = [
     type: "function",
     function: {
       name: "daicho_yomu",
-      description: "台帳の特定のページを読む。refには daicho_sagasu の結果の ref、または名簿の roomId から組み立てた文字列を渡す。書式: kaiwa#roomId#threadId#番号（その発言の前後を読む）/ nikki#roomId（日記の目次）/ nikki#roomId#番号（日記の全文）/ kioku#roomId（記憶の棚の中身すべて）/ ayumi#roomId（あゆみの目次）/ ayumi#roomId#番号（あゆみの全文）",
+      description: "台帳の特定のページを読む。refには daicho_sagasu の結果の ref、または名簿の roomId かお部屋番号から組み立てた文字列を渡す。書式: kaiwa#roomId#threadId#番号（その発言の前後を読む）/ nikki#roomId（日記の目次）/ nikki#roomId#番号（日記の全文）/ kioku#roomId（記憶の棚の中身すべて）/ ayumi#roomId（あゆみの目次）/ ayumi#roomId#番号（あゆみの全文）",
       parameters: {
         type: "object",
         properties: {
@@ -2179,7 +2193,7 @@ function execTool(room, name, args){
     const q = String(args.query).toLowerCase();
     const kindF = args.kind;
     const roomF = args.room ? String(args.room).toLowerCase() : null;
-    const targets = rooms.filter(x => !x.isKanri && (!roomF || x.name.toLowerCase().includes(roomF)));
+    const targets = rooms.filter(x => !x.isKanri && (!roomF || x.name.toLowerCase().includes(roomF) || String(x.roomNo) === roomF.replace(/号室$/,"")));
     if(targets.length === 0) return { result:"その名前の部屋は名簿に見つかりません", note:null };
     const clip = s => {
       const p = s.toLowerCase().indexOf(q);
@@ -2235,7 +2249,7 @@ function execTool(room, name, args){
     if(!room.isKanri) return { result:"エラー: 台帳は管理人だけが使えます", note:null };
     const parts = String(args.ref || "").split("#");
     const kind = parts[0], rid = parts[1];
-    const x = rooms.find(z => z.id === rid && !z.isKanri);
+    const x = rooms.find(z => !z.isKanri && (z.id === rid || String(z.roomNo) === String(rid).replace(/号室$/,"")));
     if(!x) return { result:"エラー: refの部屋が名簿に見つかりません", note:null };
     const noteY = "🗝 " + room.name + "が" + x.name + "のページをめくったよ";
     if(kind === "kaiwa"){
@@ -3151,6 +3165,7 @@ $("customUserInput").addEventListener("input", () => {
 function openProfile(){
   if(!currentRoom) return;
   $("profileTitle").textContent = currentRoom.name + " のプロフィール";
+  $("pfRoomNo").textContent = currentRoom.isKanri ? "🗝 管理人室（お部屋番号はないよ）" : (currentRoom.roomNo ? "🚪 お部屋番号: " + currentRoom.roomNo + "号室（管理人さんに伝える時に使えるよ）" : "");
   $("roomName").value = currentRoom.name;
   $("roomEmoji").value = currentRoom.emoji || "";
   $("sysPrompt").value = currentRoom.sysPrompt || "";
@@ -3636,7 +3651,7 @@ $("addRoomBtn").onclick = () => {
   const name = prompt("新しい部屋の子のなまえは?");
   if(!name || !name.trim()) return;
   const r = {
-    id: uid(), name: name.trim(), emoji: "🚪",
+    id: uid(), name: name.trim(), emoji: "🚪", roomNo: nextRoomNo(),
     model:"", modelName:"", sysPrompt:"",
     userName:"", userNote:"", memoryEnabled:true, diaryEnabled:true, ayumiEnabled:true, reasoningEnabled:false,
     theme:"lamp", threads:[],
