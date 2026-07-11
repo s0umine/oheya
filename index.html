@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>おへや v0.19</title>
+<title>おへや v0.19.1</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1193,7 +1193,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.19 ─ おまかせと、休憩時間。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.19.1 ─ おまかせと、休憩時間。</p>
   </div>
 </aside>
 
@@ -3463,10 +3463,19 @@ function roomLogLines(room, chatArr){
       continue;
     }
     if(m.role !== "user" && m.role !== "assistant") continue;
+    /* 広間の発言は、その子の名前で書き出すよ */
+    const spk = (m.role === "assistant" && m.speakerId) ? rooms.find(z => z.id === m.speakerId) : null;
     const who = m.role === "user"
       ? "🧑 " + meName
-      : (room.emoji || "🤖") + " " + room.name;
-    lines.push("## " + who + "（" + time + "）", "", m.content, "");
+      : (spk ? (spk.emoji || "🤖") + " " + spk.name : (room.emoji || "🤖") + " " + room.name);
+    lines.push("## " + who + "（" + time + "）", "");
+    /* 💭 考えごとも一緒に書き出すよ */
+    if(m.reasoning){
+      lines.push("> 💭 考えごと", ">");
+      for(const ln of String(m.reasoning).split("\n")) lines.push("> " + ln);
+      lines.push("");
+    }
+    lines.push(m.content, "");
   }
   return lines;
 }
