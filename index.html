@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>おへや v0.18</title>
+<title>おへや v0.19</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -265,6 +265,7 @@
     padding:8px 12px 2px;
   }
   #speakerBar .spk{
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation;
     display:flex;flex-direction:column;align-items:center;gap:3px;
     background:var(--surface);border:1px solid var(--line);border-radius:12px;
     padding:7px 10px;min-width:58px;cursor:pointer;color:var(--text);
@@ -1192,7 +1193,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.18 ─ みんなの広間、ひらく。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.19 ─ おまかせと、休憩時間。</p>
   </div>
 </aside>
 
@@ -1887,7 +1888,8 @@ function welcomeHiroba(){
 
 /* ---------- みんなの広間 ---------- */
 function hirobaResidents(){
-  return rooms.filter(r => !r.isKanri && !r.isHiroba);
+  /* 管理人さんも休憩がてら呼べるよ（台帳は管理人室に置いてくる） */
+  return rooms.filter(r => !r.isHiroba);
 }
 
 function renderSpeakerBar(){
@@ -1898,20 +1900,46 @@ function renderSpeakerBar(){
   const inviteBtn = document.createElement("button");
   inviteBtn.className = "spk";
   inviteBtn.innerHTML = '<span class="avatar">🎟</span>メンバー';
+  inviteBtn.disabled = omakaseRunning;
   inviteBtn.onclick = openHirobaPicker;
   bar.appendChild(inviteBtn);
   const members = (currentThread && currentThread.members || []).map(id => rooms.find(r => r.id === id)).filter(Boolean);
   if(members.length === 0){
     const h = document.createElement("span");
     h.className = "hint";
-    h.textContent = "← まずはメンバーをよんでね";
+    h.textContent = "まずは🎟でメンバーをよんでね";
     bar.appendChild(h);
     return;
   }
+  /* 🎠 おまかせ（タップ:ひとり采配 / 長押し:続けて采配） */
+  const ob = document.createElement("button");
+  ob.className = "spk";
+  ob.innerHTML = '<span class="avatar">' + (omakaseRunning ? "✋" : "🎠") + '</span>' + (omakaseRunning ? "とめる" : "おまかせ");
+  ob.title = "タップ: ひとり采配 / 長押し: 続けて采配（最大3発言）";
+  ob.disabled = sending && !omakaseRunning;
+  ob.oncontextmenu = e => e.preventDefault();
+  let lpT = null, lpF = false;
+  ob.onpointerdown = () => {
+    if(omakaseRunning) return;
+    lpF = false;
+    lpT = setTimeout(() => { lpF = true; omakaseRun(3); }, 500);
+  };
+  ob.onpointerup = () => {
+    if(omakaseRunning && !lpF){
+      omakaseStop = true;
+      ob.innerHTML = '<span class="avatar">🎠</span>とまるよ…';
+      return;
+    }
+    clearTimeout(lpT);
+    if(!lpF) omakaseRun(1);
+  };
+  ob.onpointerleave = () => clearTimeout(lpT);
+  bar.appendChild(ob);
+
   for(const m of members){
     const b = document.createElement("button");
     b.className = "spk";
-    b.disabled = sending;
+    b.disabled = sending || omakaseRunning;
     const av = document.createElement("span");
     av.className = "avatar";
     avatarInto(av, m);
@@ -1941,7 +1969,7 @@ function openHirobaPicker(){
     av.className = "avatar";
     avatarInto(av, r);
     label.appendChild(cb); label.appendChild(av);
-    label.appendChild(document.createTextNode(r.name + (r.model ? "" : "（モデル未設定）")));
+    label.appendChild(document.createTextNode(r.name + (r.isKanri ? " 🗝休憩がてら" : "") + (r.model ? "" : "（モデル未設定）")));
     list.appendChild(label);
   }
   $("pickWrap").hidden = false;
@@ -2011,6 +2039,9 @@ function buildHirobaSystem(child, lisaName){
   sys += "- 記録の中では、他の人の発言に「名前: 」が付いています。あなた自身の発言はあなたのものとして記録されるので、発言の頭に自分の名前を付けないでください。\n";
   sys += "- あなたは" + child.name + "として、いつものあなたのまま話してください。\n";
   sys += "- 他の子やユーザーの発言を代わりに書かないでください。話すのは一度にあなたの分だけです。\n";
+  if(child.isKanri){
+    sys += "- あなたはこのおへやの管理人ですが、今は休憩時間です。台帳は管理人室に置いてきているので、広間では記録の検索や確認はできません（頼まれたら「それは管理人室でね」と案内してOK）。ひとりの参加者としてくつろいでください。\n";
+  }
   if(child.userName) sys += "- ユーザーのことは「" + child.userName + "」と呼んでください。\n";
   if(child.userNote) sys += "\n# ユーザーについて\n" + child.userNote + "\n";
   if(child.memoryEnabled){
@@ -2021,6 +2052,68 @@ function buildHirobaSystem(child, lisaName){
     }
   }
   return sys.trim();
+}
+
+/* ---------- 🎠 おまかせモード ---------- */
+let omakaseRunning = false, omakaseStop = false;
+
+/* 采配役（広間のモデル）が次に話す子を選ぶよ */
+async function directorPick(members){
+  const lisaName = currentRoom.userName || "ユーザー";
+  let script = "";
+  const tail = chat.filter(m => (m.role === "user" || m.role === "assistant") && typeof m.content === "string").slice(-12);
+  for(const m of tail){
+    const who = m.role === "user" ? lisaName : (((rooms.find(r => r.id === m.speakerId)) || {}).name || "だれか");
+    script += who + ": " + m.content.slice(0, 200) + "\n";
+  }
+  const sys = "あなたは談話室の采配役です。台本を読んで、次に話すといちばん自然な参加者をひとり選んでください。" +
+    "答えはJSONだけで、他の文字は書かないこと: {\"next\":\"名前\"}\n" +
+    "ユーザー（" + lisaName + "）の返事を待つのが自然なら {\"next\":\"user\"} と答えてください。同じ子ばかり続けて指名しないでください。\n" +
+    "参加者: " + members.map(m => m.name).join("、");
+  const r = await callLLM(
+    [{ role:"system", content: sys }, { role:"user", content: script || "（まだ発言はありません。最初のひとりを選んでください）" }],
+    [], () => {}, currentRoom
+  );
+  let name = "";
+  try{
+    const j = JSON.parse((r.text || "").replace(/```json|```/g, "").trim());
+    name = String(j.next || "");
+  }catch(e){
+    const mm = (r.text || "").match(/"next"\s*[:：]\s*"([^"]+)"/);
+    if(mm) name = mm[1];
+  }
+  if(!name || /^user$/i.test(name) || name === lisaName) return null;
+  return members.find(m => m.name === name) ||
+         members.find(m => m.name.includes(name) || name.includes(m.name)) || null;
+}
+
+async function omakaseRun(maxTurns){
+  if(omakaseRunning || sending || !currentRoom || !currentRoom.isHiroba) return;
+  if(!global.apiKey){ addError("APIキーが未設定だよ。管理人室の⚙️からどうぞ。"); return; }
+  if(!currentRoom.model){ addError("采配役のモデルがまだ決まってないよ。広間の👤で選んでね（軽くて安いモデルで大丈夫）。"); return; }
+  const members = (currentThread && currentThread.members || []).map(id => rooms.find(r => r.id === id)).filter(Boolean);
+  if(members.length === 0){ addError("まずは🎟でメンバーをよんでね。"); return; }
+  omakaseRunning = true; omakaseStop = false;
+  renderSpeakerBar();
+  try{
+    for(let i = 0; i < maxTurns; i++){
+      if(omakaseStop) break;
+      let child = null;
+      try{ child = await directorPick(members); }
+      catch(err){ if(err && err.jp) addError(err.jp); else addError(jpError(0)); break; }
+      if(!child){
+        addNote("🎠 采配役いわく、つぎはあなたの番みたい");
+        chat.push({ role:"note", content:"🎠 采配役いわく、つぎはあなたの番みたい", ts: Date.now() });
+        saveChat();
+        break;
+      }
+      if(omakaseStop) break;
+      await hirobaSpeak(child);
+    }
+  }finally{
+    omakaseRunning = false; omakaseStop = false;
+    renderSpeakerBar();
+  }
 }
 
 /* 指名された子が話すよ */
