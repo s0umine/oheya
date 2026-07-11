@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>おへや v0.13</title>
+<title>おへや v0.14</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -14,7 +14,7 @@
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Shippori+Mincho:wght@500;700&family=DotGothic16&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#2B2735;
@@ -32,7 +32,110 @@
     --radius:16px;
     --font-display:"Zen Maru Gothic",sans-serif;
     --font-body:"Zen Kaku Gothic New",system-ui,sans-serif;
+    --bg-grad:#332E40;
+    --avatar-ph:#6B6480;
+    --lamp-ink:#3A2C18;
+    --code-bg:#2E2937;
+    --code-text:#EDE9F5;
+    --link:#7A5FA8;
+    --btn-hover:#494263;
+    --paper-hint:#8A7F94;
+    --bg-deep:#1E1A28;
+    --user-text:#EBE6F2; /* ユーザーバブル内の文字。バブルは常に暗めだから明色固定だよ */
   }
+
+  /* ---------- せかいのきせかえ（全体テーマ） ---------- */
+  /* 各部屋の「お部屋のあかり」（--lamp / --user）はJSが上書きするので、ここでは触らないよ */
+  html[data-theme="kojou"]{ /* 🕯️ 古城の書斎 */
+    --bg:#2A211C; --surface:#362B24; --surface2:#42352C; --line:#5A4636;
+    --bg-grad:#33281F; --bg-deep:#1C1511;
+    --paper:#EFE3C8; --ink:#3E2F23; --paper-hint:#9A8A72;
+    --text:#EDE2D0; --muted:#B3A38C; --danger:#D07B6A;
+    --radius:6px;
+    --code-bg:#241C16; --code-text:#EFE3C8; --link:#B08D57;
+    --btn-hover:#4E3E31; --avatar-ph:#6B5A48;
+    --font-display:"Shippori Mincho",serif;
+  }
+  html[data-theme="onshitsu"]{ /* 🫖 温室と紅茶 */
+    --bg:#F3EDDE; --surface:#FBF7EB; --surface2:#EDE5CF; --line:#D5C9A9;
+    --bg-grad:#EDE5D0; --bg-deep:#E5DCC5;
+    --paper:#FFFDF6; --ink:#3C4633; --paper-hint:#A39A83;
+    --text:#4A4438; --muted:#8F8570; --danger:#C25E50;
+    --radius:18px;
+    --code-bg:#3C4633; --code-text:#F3EDDE; --link:#587049;
+    --btn-hover:#E4DABF; --avatar-ph:#C9BFA5;
+    --font-display:"Shippori Mincho",serif;
+  }
+  html[data-theme="mayonaka"]{ /* 🌃 まよなかの部屋 */
+    --bg:#121418; --surface:#1A1D23; --surface2:#22262E; --line:#323845;
+    --bg-grad:#171A20; --bg-deep:#0A0C0F;
+    --paper:#E8ECF2; --ink:#2A2E36; --paper-hint:#828B9C;
+    --text:#D8DEE8; --muted:#7E8797; --danger:#E07878;
+    --radius:10px;
+    --code-bg:#0C0E11; --code-text:#C9D4E4; --link:#7FA6D9;
+    --btn-hover:#2A3038; --avatar-ph:#4A5260;
+  }
+  html[data-theme="hoshizora"]{ /* 🌌 ほしぞらの窓 */
+    --bg:#171B2E; --surface:#20263E; --surface2:#293050; --line:#3C4468;
+    --bg-grad:#1C2138; --bg-deep:#0E1120;
+    --paper:#F2EEDF; --ink:#2E3040; --paper-hint:#8F8C9E;
+    --text:#E4E6F2; --muted:#9AA0C0; --danger:#E08585;
+    --radius:16px;
+    --code-bg:#10131F; --code-text:#E0E3F0; --link:#C9B36A;
+    --btn-hover:#333B60; --avatar-ph:#565E85;
+  }
+  html[data-theme="kissaten"]{ /* ☕ 喫茶店のすみっこ */
+    --bg:#EFE6D8; --surface:#F8F1E5; --surface2:#EADDC8; --line:#D2BFA3;
+    --bg-grad:#E8DCC8; --bg-deep:#E0D4BE;
+    --paper:#FFFBF2; --ink:#4A3628; --paper-hint:#A08C74;
+    --text:#443528; --muted:#8C7A66; --danger:#B85C4A;
+    --radius:14px;
+    --code-bg:#3A2E24; --code-text:#EFE6D8; --link:#8C5A32;
+    --btn-hover:#E0D2B8; --avatar-ph:#C4AE92;
+  }
+  html[data-theme="mori"]{ /* 🌲 森のおく */
+    --bg:#1E2921; --surface:#28352B; --surface2:#324237; --line:#465B4C;
+    --bg-grad:#243027; --bg-deep:#131B15;
+    --paper:#F1EBD8; --ink:#33402F; --paper-hint:#93917A;
+    --text:#E2EADC; --muted:#93A791; --danger:#D8837A;
+    --radius:16px;
+    --code-bg:#16201A; --code-text:#DDE8D8; --link:#8FB878;
+    --btn-hover:#3A4C40; --avatar-ph:#5C7060;
+  }
+  html[data-theme="neon"]{ /* 🩷 ネオンシティ */
+    --bg:#0C0A10; --surface:#16121C; --surface2:#201826; --line:#FF2E88;
+    --bg-grad:#140E1A; --bg-deep:#060409;
+    --paper:#F8EFF5; --ink:#241B26; --paper-hint:#A886A0;
+    --text:#EDE4F0; --muted:#9B87A6; --danger:#FF5470;
+    --radius:0px;
+    --code-bg:#08060B; --code-text:#FF7EB6; --link:#FF4D9D;
+    --btn-hover:#2A1F33; --avatar-ph:#4D3A5C;
+    --font-display:"DotGothic16",monospace;
+  }
+  html[data-theme="furuhonya"]{ /* 📚 ふるほんや */
+    --bg:#E9DFC9; --surface:#F3EBD8; --surface2:#E4D8BE; --line:#C7B594;
+    --bg-grad:#E2D6BC; --bg-deep:#D8CBA9;
+    --paper:#FAF4E4; --ink:#3B3226; --paper-hint:#98876B;
+    --text:#42392C; --muted:#84775F; --danger:#B0573F;
+    --radius:8px;
+    --code-bg:#3B3226; --code-text:#E9DFC9; --link:#8A5A28;
+    --btn-hover:#DACCA9; --avatar-ph:#B8A57F;
+    --font-display:"Shippori Mincho",serif;
+  }
+  /* きせかえ選択カード */
+  .world-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+  .world-card{
+    background:var(--surface2);border:1px solid var(--line);
+    border-radius:12px;padding:10px 12px;cursor:pointer;
+    color:var(--text);text-align:left;font-family:var(--font-body);
+    display:flex;flex-direction:column;gap:6px;
+  }
+  .world-card.on{border-color:var(--lamp);box-shadow:0 0 0 2px var(--lamp-soft)}
+  .world-card .wname{font-family:var(--font-display);font-size:13px}
+  .world-card .wsw{display:flex;gap:4px}
+  .world-card .wsw i{width:16px;height:16px;border-radius:50%;border:1px solid rgba(0,0,0,.18)}
+  .world-card:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{
@@ -68,7 +171,7 @@
   header{
     padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;
     display:flex;align-items:center;gap:10px;
-    background:linear-gradient(180deg,#332E40,var(--bg));
+    background:linear-gradient(180deg,var(--bg-grad),var(--bg));
     border-bottom:1px solid var(--line);
     flex-shrink:0;
   }
@@ -82,7 +185,7 @@
   }
   .lampdot{
     width:10px;height:10px;border-radius:50%;
-    background:#6B6480;flex-shrink:0;
+    background:var(--avatar-ph);flex-shrink:0;
     transition:background .3s, box-shadow .3s;
   }
   .lampdot.on{
@@ -155,7 +258,7 @@
   .lobby-empty .door{font-size:36px;display:block;margin-bottom:8px}
   #addRoomBtn{
     position:fixed;right:18px;bottom:calc(env(safe-area-inset-bottom) + 18px);
-    background:var(--lamp);color:#3A2C18;border:none;
+    background:var(--lamp);color:var(--lamp-ink);border:none;
     border-radius:99px;padding:14px 22px;
     font-family:var(--font-display);font-size:15px;font-weight:700;
     box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;z-index:5;
@@ -180,7 +283,7 @@
   }
   .msg.user{
     align-self:flex-end;max-width:86%;
-    background:var(--user);color:var(--text);
+    background:var(--user);color:var(--user-text);
     border-radius:var(--radius) 4px var(--radius) var(--radius);
     padding:12px 15px;
   }
@@ -205,7 +308,7 @@
   }
   .msg.assistant pre{
     position:relative;
-    background:#2E2937;color:#EDE9F5;border-radius:10px;
+    background:var(--code-bg);color:var(--code-text);border-radius:10px;
     padding:34px 12px 12px;overflow-x:auto;
     margin:8px 0;font-size:13px;line-height:1.6;
   }
@@ -235,7 +338,7 @@
   }
   .msg.assistant pre code{background:none;padding:0;color:inherit}
   .msg.assistant strong{font-weight:700}
-  .msg.assistant a{color:#7A5FA8}
+  .msg.assistant a{color:var(--link)}
   .msg.assistant ul,.msg.assistant ol{padding-left:1.4em;margin:4px 0}
   .msg.assistant h1,.msg.assistant h2,.msg.assistant h3{
     font-family:var(--font-display);margin:8px 0 4px;font-size:1.05em;
@@ -254,7 +357,7 @@
   footer{
     flex-shrink:0;
     padding:10px 12px calc(env(safe-area-inset-bottom) + 10px);
-    background:linear-gradient(0deg,#332E40,var(--bg));
+    background:linear-gradient(0deg,var(--bg-grad),var(--bg));
     border-top:1px solid var(--line);
     display:flex;flex-direction:column;gap:8px;
   }
@@ -294,7 +397,7 @@
   }
   #input:focus{outline:2px solid var(--lamp);outline-offset:1px;border-color:transparent}
   #send{
-    background:var(--lamp);color:#3A2C18;border:none;
+    background:var(--lamp);color:var(--lamp-ink);border:none;
     border-radius:14px;padding:0 18px;height:44px;
     font-size:15px;font-weight:700;cursor:pointer;
     font-family:var(--font-display);transition:filter .15s;
@@ -351,9 +454,9 @@
     padding:10px 14px;font-size:13.5px;cursor:pointer;
     font-family:var(--font-body);
   }
-  .btn:hover{background:#494263}
+  .btn:hover{background:var(--btn-hover)}
   .btn:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
-  .btn.primary{background:var(--lamp);color:#3A2C18;border:none;font-weight:700;font-family:var(--font-display)}
+  .btn.primary{background:var(--lamp);color:var(--lamp-ink);border:none;font-weight:700;font-family:var(--font-display)}
   .btn.danger{color:var(--danger);border-color:var(--danger)}
   .hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.7}
   .savebar{
@@ -450,7 +553,7 @@
     position:relative;
   }
   .diary-entry .ddate{
-    font-size:11.5px;color:#8A7F94;
+    font-size:11.5px;color:var(--paper-hint);
     font-family:var(--font-display);letter-spacing:.08em;
     margin-bottom:4px;
   }
@@ -551,7 +654,7 @@
   .album-page.turnR{animation:pageTurnR .3s ease}
   @media(prefers-reduced-motion:reduce){.album-page.turnL,.album-page.turnR{animation:none}}
   .album-page .pdate{
-    font-size:11.5px;color:#8A7F94;
+    font-size:11.5px;color:var(--paper-hint);
     font-family:var(--font-display);letter-spacing:.08em;
     margin-bottom:8px;
   }
@@ -563,7 +666,7 @@
     font-size:14px;line-height:1.9;margin-top:10px;
     white-space:pre-wrap;word-break:break-word;
   }
-  .album-page .pcaption.empty{color:#8A7F94;font-size:12.5px}
+  .album-page .pcaption.empty{color:var(--paper-hint);font-size:12.5px}
   .album-page .pactions{display:flex;gap:6px;margin-top:10px;justify-content:flex-end}
   .album-page .pactions .btn{padding:5px 10px;font-size:12px;background:#EAE2D3;color:var(--ink);border-color:#D8CDB8}
   .album-page .pactions .btn.danger{color:#B54B4B;border-color:#B54B4B}
@@ -675,7 +778,7 @@
   #cropFrame{
     width:260px;height:260px;margin:0 auto;
     position:relative;overflow:hidden;border-radius:12px;
-    background:#1E1A28;touch-action:none;cursor:grab;
+    background:var(--bg-deep);touch-action:none;cursor:grab;
   }
   #cropFrame.dragging{cursor:grabbing}
   #cropImg{
@@ -1005,6 +1108,11 @@
       <button class="btn primary" id="saveGlobalBtn">保存する</button>
     </div>
     <div class="field" style="margin-top:28px">
+      <label>🎭 せかいのきせかえ（全体テーマ）</label>
+      <div class="world-grid" id="worldGrid"></div>
+      <p class="hint">おへや全体の世界観が変わるよ。各部屋の「お部屋のあかり」はそのまま生きるから、組み合わせも楽しんでね。</p>
+    </div>
+    <div class="field" style="margin-top:28px">
       <label>保存領域のようす</label>
       <div class="credits" id="storageMeter">計測中…</div>
       <p class="hint">たんす（localStorage）は約5MBの小物入れ。いっぱいに近づいたら教えてね、お引越しを考えよう。</p>
@@ -1025,7 +1133,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.13 ─ 会話のとびら、いくつでも。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.14 ─ きせかえて、どんなせかいでも。</p>
   </div>
 </aside>
 
@@ -1154,6 +1262,51 @@ function saveChat(){
   }
   save(LS_ROOMS, rooms);
 }
+
+/* ---------- せかいのきせかえ（全体テーマ） ---------- */
+const WORLD_THEMES = [
+  { key:"default",   name:"ランプの部屋",     emoji:"\u{1F3EE}", sw:["#2B2735","#F5EFE4","#F2A65A"] },
+  { key:"kojou",     name:"古城の書斎",       emoji:"\u{1F56F}\uFE0F", sw:["#2A211C","#EFE3C8","#B08D57"] },
+  { key:"onshitsu",  name:"温室と紅茶",       emoji:"\u{1FAD6}", sw:["#F3EDDE","#3C4633","#D5C9A9"] },
+  { key:"mayonaka",  name:"まよなかの部屋",   emoji:"\u{1F303}", sw:["#121418","#E8ECF2","#7FA6D9"] },
+  { key:"hoshizora", name:"ほしぞらの窓",     emoji:"\u{1F30C}", sw:["#171B2E","#F2EEDF","#C9B36A"] },
+  { key:"kissaten",  name:"喫茶店のすみっこ", emoji:"\u2615",    sw:["#EFE6D8","#4A3628","#8C5A32"] },
+  { key:"mori",      name:"森のおく",         emoji:"\u{1F332}", sw:["#1E2921","#F1EBD8","#8FB878"] },
+  { key:"neon",      name:"ネオンシティ",     emoji:"\u{1FA77}", sw:["#0C0A10","#FF2E88","#F8EFF5"] },
+  { key:"furuhonya", name:"ふるほんや",       emoji:"\u{1F4DA}", sw:["#E9DFC9","#3B3226","#8A5A28"] }
+];
+function applyWorldTheme(key){
+  const k = WORLD_THEMES.some(t => t.key === key) ? key : "default";
+  if(k === "default") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.dataset.theme = k;
+  /* ブラウザのバー色も背景に合わせるよ */
+  requestAnimationFrame(() => {
+    const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if(meta && bg) meta.setAttribute("content", bg);
+  });
+}
+function renderWorldGrid(){
+  const grid = $("worldGrid");
+  if(!grid) return;
+  grid.innerHTML = "";
+  const cur = global.worldTheme || "default";
+  for(const t of WORLD_THEMES){
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "world-card" + (t.key === cur ? " on" : "");
+    b.innerHTML = '<span class="wname">' + t.emoji + " " + t.name + '</span>' +
+      '<span class="wsw">' + t.sw.map(c => '<i style="background:' + c + '"></i>').join("") + '</span>';
+    b.onclick = () => {
+      global.worldTheme = t.key;
+      save(LS_GLOBAL, global);
+      applyWorldTheme(t.key);
+      renderWorldGrid();
+    };
+    grid.appendChild(b);
+  }
+}
+applyWorldTheme(global.worldTheme || "default");
 
 /* ---------- お部屋のあかり（テーマ） ---------- */
 const THEMES = [
@@ -2959,6 +3112,7 @@ async function renderStorageMeter(){
 }
 $("globalSettingsBtn").onclick = () => {
   $("apiKey").value = global.apiKey;
+  renderWorldGrid();
   renderStorageMeter();
   openPanel($("globalPanel"));
 };
