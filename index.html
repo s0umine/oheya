@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>おへや v0.17.1</title>
+<title>おへや v0.18</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -258,6 +258,38 @@
     max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   }
   .room-card.kanri{border-color:var(--lamp)}
+  .room-card.hiroba{border-style:double;border-width:3px}
+  .sname{display:block;font-size:10.5px;color:var(--muted);margin:0 0 3px 4px}
+  #speakerBar{
+    display:flex;gap:6px;overflow-x:auto;align-items:stretch;
+    padding:8px 12px 2px;
+  }
+  #speakerBar .spk{
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    padding:7px 10px;min-width:58px;cursor:pointer;color:var(--text);
+    font-family:var(--font-body);font-size:10.5px;white-space:nowrap;
+  }
+  #speakerBar .spk:disabled{opacity:.45;cursor:default}
+  #speakerBar .spk .avatar{width:30px;height:30px;font-size:17px}
+  #speakerBar .hint{align-self:center;color:var(--muted);font-size:12px;padding:0 4px}
+  .pick-wrap{
+    position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40;
+    display:flex;align-items:center;justify-content:center;padding:20px;
+  }
+  .pick{
+    background:var(--surface);border:1px solid var(--line);border-radius:16px;
+    padding:18px;max-width:420px;width:100%;max-height:70vh;display:flex;flex-direction:column;
+  }
+  .pick h2{font-family:var(--font-display);font-size:15.5px;margin:0 0 12px}
+  #pickList{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+  #pickList label{
+    display:flex;align-items:center;gap:10px;padding:8px 10px;
+    border:1px solid var(--line);border-radius:10px;cursor:pointer;font-size:14px;
+  }
+  #pickList .avatar{width:30px;height:30px;font-size:17px}
+  .pick-actions{display:flex;gap:8px;justify-content:flex-end}
+  #speakerBar[hidden],.pick-wrap[hidden]{display:none!important}
   .room-card.invite{border-style:dashed;background:transparent}
   .room-card.invite .rname{color:var(--muted)}
   .lobby-empty{
@@ -873,6 +905,18 @@
   <button id="addRoomBtn">＋ 新しい部屋</button>
 </div>
 
+<!-- ========== 広間のメンバーえらび ========== -->
+<div class="pick-wrap" id="pickWrap" hidden>
+  <div class="pick">
+    <h2>🎟 この話題によぶ子</h2>
+    <div id="pickList"></div>
+    <div class="pick-actions">
+      <button class="btn" id="pickCancel">やめる</button>
+      <button class="btn primary" id="pickOk">きめた</button>
+    </div>
+  </div>
+</div>
+
 <!-- ========== 各部屋 ========== -->
 <div class="screen" id="roomScreen">
   <header>
@@ -898,6 +942,7 @@
   </button>
   <main id="chat" aria-live="polite"></main>
   <footer>
+    <div id="speakerBar" hidden></div>
     <div id="attachChip" hidden>
       <img id="attachThumb" alt="">
       <span id="attachName"></span>
@@ -1147,7 +1192,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.17.1 ─ 台帳と、鍵の音。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.18 ─ みんなの広間、ひらく。</p>
   </div>
 </aside>
 
@@ -1584,19 +1629,30 @@ function renderMd(src){
   return s;
 }
 
-function addBubble(role, content, usage, imgId){
+function addBubble(role, content, usage, imgId, speaker){
   let bubble;
   if(role === "assistant"){
     const row = document.createElement("div");
     row.className = "arow";
     const av = document.createElement("span");
     av.className = "avatar";
-    if(currentRoom) avatarInto(av, currentRoom);
+    const who = speaker || currentRoom;
+    if(who) avatarInto(av, who);
     bubble = document.createElement("div");
     bubble.className = "msg assistant";
     bubble.innerHTML = renderMd(content);
     bubble.style.whiteSpace = "normal";
-    row.appendChild(av); row.appendChild(bubble);
+    row.appendChild(av);
+    if(speaker){
+      const col = document.createElement("div");
+      const nm = document.createElement("span");
+      nm.className = "sname";
+      nm.textContent = speaker.name;
+      col.appendChild(nm); col.appendChild(bubble);
+      row.appendChild(col);
+    }else{
+      row.appendChild(bubble);
+    }
     chatEl.appendChild(row);
     if(usage) addMeta(usage);
   }else{
@@ -1733,7 +1789,7 @@ function makeRoomCard(r){
   const c = lt ? (load(threadKey(r.id, lt.id)) || []) : [];
   const lastMsg = [...c].reverse().find(m => m.role === "user" || m.role === "assistant");
   const card = document.createElement("button");
-  card.className = "room-card" + (r.isKanri ? " kanri" : "");
+  card.className = "room-card" + (r.isKanri ? " kanri" : "") + (r.isHiroba ? " hiroba" : "");
   const face = document.createElement("span");
   face.className = "avatar face";
   avatarInto(face, r);
@@ -1741,7 +1797,7 @@ function makeRoomCard(r){
   info.className = "info";
   info.innerHTML =
     '<span class="rname">' + esc(r.name) + (r.isKanri ? ' <span style="font-size:10.5px;color:var(--muted)">─ 管理人</span>' : '') + '</span>' +
-    '<span class="snippet">' + (lastMsg ? esc(lastMsg.content.slice(0,40)) : (r.isKanri ? "台帳のことなら、いつでもどうぞ" : "まだ会話がないよ")) + '</span>' +
+    '<span class="snippet">' + (lastMsg ? esc(lastMsg.content.slice(0,40)) : (r.isKanri ? "台帳のことなら、いつでもどうぞ" : (r.isHiroba ? "みんなでお話しする談話室だよ" : "まだ会話がないよ"))) + '</span>' +
     (r.modelName ? '<span class="rmodel">' + esc(r.modelName) + '</span>' : "");
   card.appendChild(face); card.appendChild(info);
   card.style.borderLeft = "3px solid " + themeColorsFor(r).lamp;
@@ -1769,7 +1825,21 @@ function renderLobby(){
     list.appendChild(inv);
   }
 
-  const residents = rooms.filter(r => !r.isKanri);
+  /* みんなの広間（管理人さんの机のとなり） */
+  const hiroba = rooms.find(r => r.isHiroba);
+  if(hiroba){
+    list.appendChild(makeRoomCard(hiroba));
+  }else{
+    const inv = document.createElement("button");
+    inv.className = "room-card hiroba invite";
+    inv.innerHTML = '<span class="avatar face">🛋</span>' +
+      '<span class="info"><span class="rname">みんなの広間をひらく</span>' +
+      '<span class="snippet">うちの子達が集まっておしゃべりする談話室だよ</span></span>';
+    inv.onclick = welcomeHiroba;
+    list.appendChild(inv);
+  }
+
+  const residents = rooms.filter(r => !r.isKanri && !r.isHiroba);
   if(residents.length === 0){
     const e = document.createElement("div");
     e.className = "lobby-empty";
@@ -1799,6 +1869,214 @@ function welcomeKanri(){
   openRoom(r.id);
 }
 
+/* みんなの広間をひらくよ */
+function welcomeHiroba(){
+  if(rooms.some(r => r.isHiroba)) return;
+  const r = {
+    id: uid(), name: "みんなの広間", emoji: "🛋", isHiroba: true,
+    model:"", modelName:"", sysPrompt:"",
+    userName:"", userNote:"", memoryEnabled:false, diaryEnabled:false, ayumiEnabled:false, reasoningEnabled:false,
+    theme:"lamp", threads:[],
+    createdAt: Date.now()
+  };
+  rooms.push(r);
+  save(LS_ROOMS, rooms);
+  renderLobby();
+  openRoom(r.id);
+}
+
+/* ---------- みんなの広間 ---------- */
+function hirobaResidents(){
+  return rooms.filter(r => !r.isKanri && !r.isHiroba);
+}
+
+function renderSpeakerBar(){
+  const bar = $("speakerBar");
+  if(!currentRoom || !currentRoom.isHiroba){ bar.hidden = true; return; }
+  bar.hidden = false;
+  bar.innerHTML = "";
+  const inviteBtn = document.createElement("button");
+  inviteBtn.className = "spk";
+  inviteBtn.innerHTML = '<span class="avatar">🎟</span>メンバー';
+  inviteBtn.onclick = openHirobaPicker;
+  bar.appendChild(inviteBtn);
+  const members = (currentThread && currentThread.members || []).map(id => rooms.find(r => r.id === id)).filter(Boolean);
+  if(members.length === 0){
+    const h = document.createElement("span");
+    h.className = "hint";
+    h.textContent = "← まずはメンバーをよんでね";
+    bar.appendChild(h);
+    return;
+  }
+  for(const m of members){
+    const b = document.createElement("button");
+    b.className = "spk";
+    b.disabled = sending;
+    const av = document.createElement("span");
+    av.className = "avatar";
+    avatarInto(av, m);
+    b.appendChild(av);
+    b.appendChild(document.createTextNode(m.name));
+    b.title = m.name + "に話してもらう";
+    b.onclick = () => hirobaSpeak(m);
+    bar.appendChild(b);
+  }
+}
+
+function openHirobaPicker(){
+  const list = $("pickList");
+  list.innerHTML = "";
+  const cur = new Set(currentThread && currentThread.members || []);
+  const residents = hirobaResidents();
+  if(residents.length === 0){
+    list.innerHTML = '<p class="hint">まだお部屋の子がいないよ。先に「＋ 新しい部屋」で子を迎えてね。</p>';
+  }
+  for(const r of residents){
+    const label = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.value = r.id;
+    cb.checked = cur.has(r.id);
+    const av = document.createElement("span");
+    av.className = "avatar";
+    avatarInto(av, r);
+    label.appendChild(cb); label.appendChild(av);
+    label.appendChild(document.createTextNode(r.name + (r.model ? "" : "（モデル未設定）")));
+    list.appendChild(label);
+  }
+  $("pickWrap").hidden = false;
+}
+$("pickCancel").onclick = () => {
+  $("pickWrap").hidden = true;
+  if(currentThread && !currentThread.members){ currentThread.members = []; save(LS_ROOMS, rooms); }
+  renderSpeakerBar();
+};
+$("pickOk").onclick = () => {
+  const ids = [...document.querySelectorAll("#pickList input:checked")].map(i => i.value);
+  if(currentThread){ currentThread.members = ids; save(LS_ROOMS, rooms); }
+  $("pickWrap").hidden = true;
+  renderSpeakerBar();
+};
+
+/* 広間でのリサの発言は、台本に書くだけ（自動返信なし） */
+async function hirobaUserSend(text, image){
+  if(chat.length === 0) chatEl.innerHTML = "";
+  let imgId = null;
+  if(image){
+    imgId = uid();
+    try{ await imgPut({ id: imgId, roomId: currentRoom.id, dataUrl: image.dataUrl, name: image.name || "" }); }
+    catch(e){ imgId = null; }
+  }
+  const entry = { role:"user", content:text, ts:Date.now() };
+  if(imgId){ entry.imgId = imgId; entry.imgName = image.name || ""; }
+  chat.push(entry);
+  saveChat();
+  addBubble("user", text, null, imgId);
+}
+
+/* 広間の台本を「この子の視点」に組み替えるよ */
+function buildHirobaMessages(child){
+  const lisaName = currentRoom.userName || "ユーザー";
+  const msgs = [];
+  const sys = buildHirobaSystem(child, lisaName);
+  if(sys) msgs.push({ role:"system", content: sys });
+  let buf = [];
+  const flush = () => {
+    if(buf.length){ msgs.push({ role:"user", content: buf.join("\n\n") }); buf = []; }
+  };
+  for(const m of chat){
+    if(m.role !== "user" && m.role !== "assistant") continue;
+    if(typeof m.content !== "string" || !m.content) continue;
+    if(m.role === "assistant" && m.speakerId === child.id){
+      flush();
+      msgs.push({ role:"assistant", content: m.content });
+    }else{
+      const who = m.role === "user" ? lisaName : ((rooms.find(r => r.id === m.speakerId) || {}).name || "だれか");
+      let c = m.content;
+      if(m.role === "user" && m.imgId) c += "\n（このとき画像を1枚見せてもらったけど、画像はその場かぎりで今は見えないよ）";
+      buf.push(who + ": " + c);
+    }
+  }
+  flush();
+  return msgs;
+}
+
+function buildHirobaSystem(child, lisaName){
+  let sys = child.sysPrompt || "";
+  const members = (currentThread.members || []).map(id => rooms.find(r => r.id === id)).filter(Boolean);
+  const others = members.filter(m => m.id !== child.id).map(m => m.name);
+  sys += "\n\n# みんなの広間\n";
+  sys += "あなたは今「みんなの広間」にいます。ここは、それぞれのお部屋に住むAIたちが集まっておしゃべりする談話室です。\n";
+  sys += "- この場にいるのは: " + lisaName + "（ユーザー）、あなた（" + child.name + "）" + (others.length ? "、" + others.join("、") : "") + "\n";
+  sys += "- 記録の中では、他の人の発言に「名前: 」が付いています。あなた自身の発言はあなたのものとして記録されるので、発言の頭に自分の名前を付けないでください。\n";
+  sys += "- あなたは" + child.name + "として、いつものあなたのまま話してください。\n";
+  sys += "- 他の子やユーザーの発言を代わりに書かないでください。話すのは一度にあなたの分だけです。\n";
+  if(child.userName) sys += "- ユーザーのことは「" + child.userName + "」と呼んでください。\n";
+  if(child.userNote) sys += "\n# ユーザーについて\n" + child.userNote + "\n";
+  if(child.memoryEnabled){
+    const shelf = loadShelf(child.id);
+    if(shelf.items.length){
+      sys += "\n# あなたの記憶の棚（広間では読むだけ。書き込みは自分の部屋で）\n";
+      for(const it of shelf.items) sys += "[" + it.id + "] " + it.content + "\n";
+    }
+  }
+  return sys.trim();
+}
+
+/* 指名された子が話すよ */
+async function hirobaSpeak(child){
+  if(sending || !currentRoom || !currentRoom.isHiroba) return;
+  if(!global.apiKey){ addError("APIキーが未設定だよ。管理人室の⚙️からどうぞ。"); return; }
+  if(!child.model){ addError(child.name + "のモデルがまだ決まってないよ。その子の部屋の👤で選んでね。"); return; }
+  sending = true; sendBtn.disabled = true;
+  renderSpeakerBar();
+
+  const typing = document.createElement("div");
+  typing.className = "typing"; typing.textContent = child.name + "がかんがえ中";
+  chatEl.appendChild(typing); scrollBottom();
+
+  const messages = buildHirobaMessages(child);
+  try{
+    let bubble = null, thoughtEl = null;
+    const r = await callLLM(messages, [], (t, th) => {
+      if(th && !thoughtEl){
+        if(typing.parentNode) typing.remove();
+        thoughtEl = addThought("", true);
+      }
+      if(thoughtEl && th) thoughtEl.querySelector(".tbody").textContent = th;
+      if(t){
+        if(!bubble){
+          if(typing.parentNode) typing.remove();
+          bubble = addBubble("assistant", "", null, null, child);
+        }
+        bubble.innerHTML = renderMd(t);
+      }
+      scrollBottom();
+    }, child);
+    if(typing.parentNode) typing.remove();
+    if(r.text){
+      /* うっかり自分の名前を頭につけちゃったら、そっと外すよ */
+      const clean = r.text.replace(new RegExp("^\\s*" + child.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*[:：]\\s*"), "");
+      const entry = { role:"assistant", content: clean, ts: Date.now(), speakerId: child.id };
+      if(r.reasoning) entry.reasoning = r.reasoning;
+      chat.push(entry);
+      saveChat();
+      if(bubble) bubble.innerHTML = renderMd(clean);
+      if(r.usage) addMeta(r.usage);
+    }else{
+      addError("お返事が空っぽで返ってきたみたい…もう一度試してみて。");
+    }
+    scrollBottom();
+  }catch(err){
+    if(typing.parentNode) typing.remove();
+    if(err && err.jp) addError(err.jp);
+    else addError(jpError(0));
+  }finally{
+    sending = false; sendBtn.disabled = false;
+    renderSpeakerBar();
+  }
+}
+
 function openRoom(id, threadId){
   currentRoom = rooms.find(r => r.id === id);
   if(!currentRoom) return;
@@ -1816,7 +2094,12 @@ function openRoom(id, threadId){
   avatarInto($("headerAvatar"), currentRoom);
   renderChat();
   showScreen("room");
-  if(!currentRoom.model) openProfile();
+  renderSpeakerBar();
+  if(currentRoom.isHiroba){
+    if(!currentThread.members) openHirobaPicker();
+  }else if(!currentRoom.model){
+    openProfile();
+  }
 }
 
 function renderChat(){
@@ -1828,8 +2111,12 @@ function renderChat(){
     av.className = "avatar";
     avatarInto(av, currentRoom);
     const t = document.createElement("span");
-    t.innerHTML = esc(currentRoom.name) + (currentRoom.isKanri ? 'の机だよ。<br>' : 'の部屋だよ。<br>') +
-      (currentRoom.model ? "話しかけてみてね。" : "まずは右上の 👤 でモデルを選んでね。");
+    if(currentRoom.isHiroba){
+      t.innerHTML = 'みんなの広間だよ。<br>下の🎟でメンバーをよんで、話しかけたら顔をタップしてね。';
+    }else{
+      t.innerHTML = esc(currentRoom.name) + (currentRoom.isKanri ? 'の机だよ。<br>' : 'の部屋だよ。<br>') +
+        (currentRoom.model ? "話しかけてみてね。" : "まずは右上の 👤 でモデルを選んでね。");
+    }
     w.appendChild(av); w.appendChild(t);
     chatEl.appendChild(w);
     return;
@@ -1839,7 +2126,8 @@ function renderChat(){
     if(m.role === "note") addNote(m.content);
     else{
       if(m.role === "assistant" && m.reasoning) addThought(m.reasoning, false);
-      const el = addBubble(m.role, m.content, m.usage, m.imgId);
+      const spk = (m.speakerId && currentRoom && currentRoom.isHiroba) ? rooms.find(r => r.id === m.speakerId) : null;
+      const el = addBubble(m.role, m.content, m.usage, m.imgId, spk || undefined);
       if(el) el.dataset.ci = i;
     }
   }
@@ -1921,7 +2209,7 @@ function buildSystem(room){
     sys += "- 記憶の整理などの相談を受けたら、まず台帳で実際の記録を確かめてから答えます。\n";
     sys += "- 部屋の見分けは「お部屋番号」と名前で行います。roomIdは機械用の長い文字列で、作成時刻が近いと先頭が似るため、目視で比べたり同一だと判断したりしません。\n";
     sys += "\n## 住人名簿\n";
-    const residents = rooms.filter(x => !x.isKanri);
+    const residents = rooms.filter(x => !x.isKanri && !x.isHiroba);
     if(residents.length === 0){
       sys += "（まだ住人はいません）\n";
     }else{
@@ -2210,7 +2498,7 @@ function execTool(room, name, args){
             if(m.role !== "user" && m.role !== "assistant") continue;
             if(typeof m.content !== "string" || !m.content) continue;
             if(m.content.toLowerCase().includes(q)){
-              const who = m.role === "assistant" ? x.name : (x.userName || "ユーザー");
+              const who = m.role === "assistant" ? (((m.speakerId && rooms.find(z => z.id === m.speakerId)) || x).name) : (x.userName || "ユーザー");
               hits.push({ ts: m.ts || 0, line: "[会話] " + x.name + "の部屋 🧵" + t.title + " " + fmtWhen(m.ts) + " " + who + "「" + clip(m.content) + "」 ref: kaiwa#" + x.id + "#" + t.id + "#" + i });
             }
           }
@@ -2264,7 +2552,7 @@ function execTool(room, name, args){
         const m = c[i];
         if(m.role !== "user" && m.role !== "assistant") continue;
         if(typeof m.content !== "string") continue;
-        const who = m.role === "assistant" ? x.name : (x.userName || "ユーザー");
+        const who = m.role === "assistant" ? (((m.speakerId && rooms.find(z => z.id === m.speakerId)) || x).name) : (x.userName || "ユーザー");
         const body = m.content.length > 500 ? m.content.slice(0, 500) + "…" : m.content;
         out += "---\n[" + i + "] " + who + " " + fmtWhen(m.ts) + "\n" + body + "\n";
       }
@@ -2316,16 +2604,17 @@ function execTool(room, name, args){
 
 /* ---------- LLM呼び出し（ストリーミング＋ツール対応） ---------- */
 async function callLLM(messages, tools){
+  const asRoom = arguments[3] || currentRoom; /* 広間では「今話す子」を渡す */
   const body = {
-    model: currentRoom.model,
+    model: asRoom.model,
     messages,
     stream: true,
     usage: { include: true }
   };
   if(tools && tools.length) body.tools = tools;
   /* Claude系はこの1行でプロンプトキャッシュが効く（長い会話の再読込が割引になる） */
-  if(/^anthropic\//.test(currentRoom.model || "")) body.cache_control = { type: "ephemeral" };
-  if(currentRoom.reasoningEnabled) body.reasoning = { enabled: true };
+  if(/^anthropic\//.test(asRoom.model || "")) body.cache_control = { type: "ephemeral" };
+  if(asRoom.reasoningEnabled) body.reasoning = { enabled: true };
 
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -2448,6 +2737,12 @@ async function send(){
 
 async function sendText(text, apiOnlyExtra, image){
   if(!text || sending || !currentRoom) return;
+  if(currentRoom.isHiroba){
+    sending = true; sendBtn.disabled = true;
+    try{ await hirobaUserSend(text, image); }
+    finally{ sending = false; sendBtn.disabled = false; renderSpeakerBar(); inputEl.focus(); }
+    return;
+  }
   if(!global.apiKey){ addError("APIキーが未設定だよ。管理人室の⚙️からどうぞ。"); return; }
   if(!currentRoom.model){ addError("この部屋のモデルがまだ決まってないよ。👤で選んでね。"); return; }
 
@@ -3743,7 +4038,7 @@ function runSearch(){
     avatarInto(av, h.room);
     const body = document.createElement("div");
     body.className = "body";
-    const speaker = h.m.role === "assistant" ? h.room.name : (h.room.userName || "あなた");
+    const speaker = h.m.role === "assistant" ? (((h.m.speakerId && rooms.find(z => z.id === h.m.speakerId)) || h.room).name) : (h.room.userName || "あなた");
     body.innerHTML =
       '<div class="who">' + esc(h.room.name) + 'の部屋 ─ ' + esc(speaker) +
       ' <span class="when">🧵' + esc(h.thread.title) + ' ・ ' + fmtWhen(h.m.ts) + '</span></div>' +
