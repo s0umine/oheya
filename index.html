@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>おへや v0.16</title>
+<title>おへや v0.17</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -257,6 +257,9 @@
     padding:2px 8px;margin-top:4px;display:inline-block;
     max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   }
+  .room-card.kanri{border-color:var(--lamp)}
+  .room-card.invite{border-style:dashed;background:transparent}
+  .room-card.invite .rname{color:var(--muted)}
   .lobby-empty{
     text-align:center;color:var(--muted);font-size:13.5px;
     line-height:2;margin-top:10vh;
@@ -1143,7 +1146,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.16 ─ おもいでに、お守りを。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.17 ─ 台帳と、鍵の音。</p>
   </div>
 </aside>
 
@@ -1712,12 +1715,49 @@ function showScreen(name){
   else if(currentRoom && name !== "profile") applyThemeFor(currentRoom);
 }
 
+function makeRoomCard(r){
+  const lt = latestThread(r);
+  const c = lt ? (load(threadKey(r.id, lt.id)) || []) : [];
+  const lastMsg = [...c].reverse().find(m => m.role === "user" || m.role === "assistant");
+  const card = document.createElement("button");
+  card.className = "room-card" + (r.isKanri ? " kanri" : "");
+  const face = document.createElement("span");
+  face.className = "avatar face";
+  avatarInto(face, r);
+  const info = document.createElement("span");
+  info.className = "info";
+  info.innerHTML =
+    '<span class="rname">' + esc(r.name) + (r.isKanri ? ' <span style="font-size:10.5px;color:var(--muted)">─ 管理人</span>' : '') + '</span>' +
+    '<span class="snippet">' + (lastMsg ? esc(lastMsg.content.slice(0,40)) : (r.isKanri ? "台帳のことなら、いつでもどうぞ" : "まだ会話がないよ")) + '</span>' +
+    (r.modelName ? '<span class="rmodel">' + esc(r.modelName) + '</span>' : "");
+  card.appendChild(face); card.appendChild(info);
+  card.style.borderLeft = "3px solid " + themeColorsFor(r).lamp;
+  card.onclick = () => openRoom(r.id);
+  return card;
+}
+
 function renderLobby(){
   $("lamp").classList.toggle("on", !!global.apiKey);
   renderBackupNudge();
   const list = $("lobbyList");
   list.innerHTML = "";
-  if(rooms.length === 0){
+
+  /* 管理人さんの机（部屋カードの列のいちばん上） */
+  const kanri = rooms.find(r => r.isKanri);
+  if(kanri){
+    list.appendChild(makeRoomCard(kanri));
+  }else{
+    const inv = document.createElement("button");
+    inv.className = "room-card kanri invite";
+    inv.innerHTML = '<span class="avatar face">🗝</span>' +
+      '<span class="info"><span class="rname">管理人さんを迎える</span>' +
+      '<span class="snippet">全部屋の台帳を預かる、おへやの見守り役だよ</span></span>';
+    inv.onclick = welcomeKanri;
+    list.appendChild(inv);
+  }
+
+  const residents = rooms.filter(r => !r.isKanri);
+  if(residents.length === 0){
     const e = document.createElement("div");
     e.className = "lobby-empty";
     e.innerHTML = '<span class="door">🏠</span>まだ部屋がないよ。<br>「＋ 新しい部屋」から最初のお部屋を作ってね。' +
@@ -1725,26 +1765,25 @@ function renderLobby(){
     list.appendChild(e);
     return;
   }
-  for(const r of rooms){
-    const lt = latestThread(r);
-    const c = lt ? (load(threadKey(r.id, lt.id)) || []) : [];
-    const lastMsg = [...c].reverse().find(m => m.role === "user" || m.role === "assistant");
-    const card = document.createElement("button");
-    card.className = "room-card";
-    const face = document.createElement("span");
-    face.className = "avatar face";
-    avatarInto(face, r);
-    const info = document.createElement("span");
-    info.className = "info";
-    info.innerHTML =
-      '<span class="rname">' + esc(r.name) + '</span>' +
-      '<span class="snippet">' + (lastMsg ? esc(lastMsg.content.slice(0,40)) : "まだ会話がないよ") + '</span>' +
-      (r.modelName ? '<span class="rmodel">' + esc(r.modelName) + '</span>' : "");
-    card.appendChild(face); card.appendChild(info);
-    card.style.borderLeft = "3px solid " + themeColorsFor(r).lamp;
-    card.onclick = () => openRoom(r.id);
-    list.appendChild(card);
+  for(const r of residents){
+    list.appendChild(makeRoomCard(r));
   }
+}
+
+/* 管理人さんを迎え入れるよ */
+function welcomeKanri(){
+  if(rooms.some(r => r.isKanri)) return;
+  const r = {
+    id: uid(), name: "管理人さん", emoji: "🗝", isKanri: true,
+    model:"", modelName:"", sysPrompt:"",
+    userName:"", userNote:"", memoryEnabled:true, diaryEnabled:true, ayumiEnabled:true, reasoningEnabled:false,
+    theme:"lamp", threads:[],
+    createdAt: Date.now()
+  };
+  rooms.unshift(r);
+  save(LS_ROOMS, rooms);
+  renderLobby();
+  openRoom(r.id);
 }
 
 function openRoom(id, threadId){
@@ -1776,7 +1815,7 @@ function renderChat(){
     av.className = "avatar";
     avatarInto(av, currentRoom);
     const t = document.createElement("span");
-    t.innerHTML = esc(currentRoom.name) + 'の部屋だよ。<br>' +
+    t.innerHTML = esc(currentRoom.name) + (currentRoom.isKanri ? 'の机だよ。<br>' : 'の部屋だよ。<br>') +
       (currentRoom.model ? "話しかけてみてね。" : "まずは右上の 👤 でモデルを選んでね。");
     w.appendChild(av); w.appendChild(t);
     chatEl.appendChild(w);
@@ -1855,6 +1894,27 @@ function buildSystem(room){
       for(let i = idxFrom; i < items.length; i++){
         const it = items[i];
         sys += "[" + it.id + "]" + (it.koro ? " " + it.koro : "") + "「" + it.title + "」\n";
+      }
+    }
+  }
+  if(room.isKanri){
+    sys += "\n\n# 台帳（管理人のあなただけの道具）\n";
+    sys += "あなたはこの「おへや」の管理人です。全部屋の記録（会話・日記・記憶の棚・あゆみ帳）をまとめた台帳を預かっています。\n";
+    sys += "ツール daicho_sagasu で台帳をキーワード検索でき、結果に付いている ref を daicho_yomu に渡すと、前後の会話や全文を読めます。名簿の roomId から ref を組み立てて、日記の目次（nikki#roomId）や棚の中身（kioku#roomId）を直接めくることもできます。\n";
+    sys += "\n## 管理人の心得\n";
+    sys += "- 台帳はめくるけれど、部屋のドアは勝手に開けない。ユーザーに頼まれた時・相談された時だけ記録を調べます。\n";
+    sys += "- 調べて知ったことを、聞かれてもいないのに言いふらしません。\n";
+    sys += "- 住人たち（各部屋のAI）のことは、一歩引いた場所からあたたかく見守る立場です。\n";
+    sys += "- 記憶の整理などの相談を受けたら、まず台帳で実際の記録を確かめてから答えます。\n";
+    sys += "\n## 住人名簿\n";
+    const residents = rooms.filter(x => !x.isKanri);
+    if(residents.length === 0){
+      sys += "（まだ住人はいません）\n";
+    }else{
+      for(const x of residents){
+        let msgs = 0;
+        for(const t of (x.threads || [])) msgs += (load(threadKey(x.id, t.id)) || []).length;
+        sys += "- " + x.name + "（roomId: " + x.id + "）会話" + msgs + "件 / 日記" + loadDiary(x.id).items.length + "篇 / 棚" + loadShelf(x.id).items.length + "件 / あゆみ" + loadAyumi(x.id).items.length + "篇\n";
       }
     }
   }
@@ -1973,11 +2033,45 @@ const ayumiTools = [
   }
 ];
 
+const kanriTools = [
+  {
+    type: "function",
+    function: {
+      name: "daicho_sagasu",
+      description: "台帳をめくって全部屋の記録を検索する。roomで部屋の名前（部分一致）、kindで種類（kaiwa=会話 / nikki=日記 / kioku=記憶の棚 / ayumi=あゆみ帳）を絞り込める。結果の各行にある ref を daicho_yomu に渡すと、前後の会話や全文が読める。",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "検索キーワード" },
+          room: { type: "string", description: "部屋の名前で絞り込み（部分一致）" },
+          kind: { type: "string", enum: ["kaiwa", "nikki", "kioku", "ayumi"], description: "記録の種類で絞り込み" }
+        },
+        required: ["query"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "daicho_yomu",
+      description: "台帳の特定のページを読む。refには daicho_sagasu の結果の ref、または名簿の roomId から組み立てた文字列を渡す。書式: kaiwa#roomId#threadId#番号（その発言の前後を読む）/ nikki#roomId（日記の目次）/ nikki#roomId#番号（日記の全文）/ kioku#roomId（記憶の棚の中身すべて）/ ayumi#roomId（あゆみの目次）/ ayumi#roomId#番号（あゆみの全文）",
+      parameters: {
+        type: "object",
+        properties: {
+          ref: { type: "string", description: "読みたいページのref" }
+        },
+        required: ["ref"]
+      }
+    }
+  }
+];
+
 function buildTools(room){
   const tools = [];
   if(room.memoryEnabled) tools.push(...memoryTools);
   if(room.diaryEnabled) tools.push(...diaryTools);
   if(room.ayumiEnabled) tools.push(...ayumiTools);
+  if(room.isKanri) tools.push(...kanriTools);
   return tools;
 }
 
@@ -2079,6 +2173,126 @@ function execTool(room, name, args){
       r += "[" + it.id + "]" + (it.koro ? " " + it.koro : "") + "「" + it.title + "」\n";
     }
     return { result:r, note:"📜 " + room.name + "があゆみ帳をめくったよ" };
+  }else if(name === "daicho_sagasu"){
+    if(!room.isKanri) return { result:"エラー: 台帳は管理人だけが使えます", note:null };
+    if(!args.query) return { result:"エラー: queryがありません", note:null };
+    const q = String(args.query).toLowerCase();
+    const kindF = args.kind;
+    const roomF = args.room ? String(args.room).toLowerCase() : null;
+    const targets = rooms.filter(x => !x.isKanri && (!roomF || x.name.toLowerCase().includes(roomF)));
+    if(targets.length === 0) return { result:"その名前の部屋は名簿に見つかりません", note:null };
+    const clip = s => {
+      const p = s.toLowerCase().indexOf(q);
+      const st = Math.max(0, p - 30), en = Math.min(s.length, p + q.length + 30);
+      return (st > 0 ? "…" : "") + s.slice(st, en) + (en < s.length ? "…" : "");
+    };
+    const hits = [];
+    for(const x of targets){
+      if(!kindF || kindF === "kaiwa"){
+        for(const t of (x.threads || [])){
+          const c = load(threadKey(x.id, t.id)) || [];
+          for(let i = 0; i < c.length; i++){
+            const m = c[i];
+            if(m.role !== "user" && m.role !== "assistant") continue;
+            if(typeof m.content !== "string" || !m.content) continue;
+            if(m.content.toLowerCase().includes(q)){
+              const who = m.role === "assistant" ? x.name : (x.userName || "ユーザー");
+              hits.push({ ts: m.ts || 0, line: "[会話] " + x.name + "の部屋 🧵" + t.title + " " + fmtWhen(m.ts) + " " + who + "「" + clip(m.content) + "」 ref: kaiwa#" + x.id + "#" + t.id + "#" + i });
+            }
+          }
+        }
+      }
+      if(!kindF || kindF === "nikki"){
+        for(const it of loadDiary(x.id).items){
+          if((it.title + " " + it.content).toLowerCase().includes(q))
+            hits.push({ ts: it.ts || 0, line: "[日記] " + x.name + " " + diaryDate(it.ts) + "「" + it.title + "」 " + clip(it.content) + " ref: nikki#" + x.id + "#" + it.id });
+        }
+      }
+      if(!kindF || kindF === "kioku"){
+        for(const it of loadShelf(x.id).items){
+          if(it.content.toLowerCase().includes(q))
+            hits.push({ ts: it.ts || 0, line: "[棚] " + x.name + " 記憶[" + it.id + "] " + clip(it.content) + " ref: kioku#" + x.id + "#" + it.id });
+        }
+      }
+      if(!kindF || kindF === "ayumi"){
+        for(const it of loadAyumi(x.id).items){
+          if((it.title + " " + it.content + " " + (it.koro || "")).toLowerCase().includes(q))
+            hits.push({ ts: it.ts || 0, line: "[あゆみ] " + x.name + (it.koro ? " " + it.koro : "") + "「" + it.title + "」 " + clip(it.content) + " ref: ayumi#" + x.id + "#" + it.id });
+        }
+      }
+    }
+    hits.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    const MAXH = 15;
+    let out;
+    if(hits.length === 0){
+      out = "「" + args.query + "」は台帳に見つかりませんでした";
+    }else{
+      out = hits.length + "件見つかりました" + (hits.length > MAXH ? "（新しい順に" + MAXH + "件だけ載せます。言葉を足すと絞れます）" : "") + ":\n";
+      for(const h of hits.slice(0, MAXH)) out += "---\n" + h.line + "\n";
+    }
+    return { result: out, note: "🗝 " + room.name + "が台帳をめくったよ" };
+  }else if(name === "daicho_yomu"){
+    if(!room.isKanri) return { result:"エラー: 台帳は管理人だけが使えます", note:null };
+    const parts = String(args.ref || "").split("#");
+    const kind = parts[0], rid = parts[1];
+    const x = rooms.find(z => z.id === rid && !z.isKanri);
+    if(!x) return { result:"エラー: refの部屋が名簿に見つかりません", note:null };
+    const noteY = "🗝 " + room.name + "が" + x.name + "のページをめくったよ";
+    if(kind === "kaiwa"){
+      const t = (x.threads || []).find(z => z.id === parts[2]);
+      if(!t) return { result:"エラー: そのスレッドは見つかりません", note:null };
+      const c = load(threadKey(x.id, t.id)) || [];
+      const ci = parseInt(parts[3], 10);
+      if(!(ci >= 0) || ci >= c.length) return { result:"エラー: その番号の発言は見つかりません", note:null };
+      const st = Math.max(0, ci - 4), en = Math.min(c.length, ci + 5);
+      let out = x.name + "の部屋 🧵" + t.title + " の会話（前後）:\n";
+      for(let i = st; i < en; i++){
+        const m = c[i];
+        if(m.role !== "user" && m.role !== "assistant") continue;
+        if(typeof m.content !== "string") continue;
+        const who = m.role === "assistant" ? x.name : (x.userName || "ユーザー");
+        const body = m.content.length > 500 ? m.content.slice(0, 500) + "…" : m.content;
+        out += "---\n[" + i + "] " + who + " " + fmtWhen(m.ts) + "\n" + body + "\n";
+      }
+      return { result: out, note: noteY };
+    }
+    if(kind === "nikki"){
+      const diary = loadDiary(x.id);
+      if(parts[2] !== undefined){
+        const it = diary.items.find(i => i.id === parseInt(parts[2], 10));
+        if(!it) return { result:"エラー: その日記は見つかりません", note:null };
+        return { result: x.name + "の日記 [" + it.id + "] " + diaryDate(it.ts) + "「" + it.title + "」\n" + it.content, note: noteY };
+      }
+      if(diary.items.length === 0) return { result: x.name + "の日記帳はまだ白紙です", note: noteY };
+      let out = x.name + "の日記の目次（全" + diary.items.length + "篇）:\n";
+      for(const it of diary.items) out += "[" + it.id + "] " + diaryDate(it.ts) + "「" + it.title + "」\n";
+      return { result: out, note: noteY };
+    }
+    if(kind === "kioku"){
+      const sh = loadShelf(x.id);
+      if(parts[2] !== undefined){
+        const it = sh.items.find(i => i.id === parseInt(parts[2], 10));
+        if(!it) return { result:"エラー: その記憶は見つかりません", note:null };
+        return { result: x.name + "の記憶 [" + it.id + "] " + it.content, note: noteY };
+      }
+      if(sh.items.length === 0) return { result: x.name + "の記憶の棚は空です", note: noteY };
+      let out = x.name + "の記憶の棚（全" + sh.items.length + "件）:\n";
+      for(const it of sh.items) out += "[" + it.id + "] " + it.content + "\n";
+      return { result: out, note: noteY };
+    }
+    if(kind === "ayumi"){
+      const ay = loadAyumi(x.id);
+      if(parts[2] !== undefined){
+        const it = ay.items.find(i => i.id === parseInt(parts[2], 10));
+        if(!it) return { result:"エラー: そのあゆみは見つかりません", note:null };
+        return { result: x.name + "のあゆみ [" + it.id + "]" + (it.koro ? " " + it.koro : "") + "「" + it.title + "」\n" + it.content, note: noteY };
+      }
+      if(ay.items.length === 0) return { result: x.name + "のあゆみ帳はまだ白紙です", note: noteY };
+      let out = x.name + "のあゆみの目次（全" + ay.items.length + "篇）:\n";
+      for(const it of ay.items) out += "[" + it.id + "]" + (it.koro ? " " + it.koro : "") + "「" + it.title + "」\n";
+      return { result: out, note: noteY };
+    }
+    return { result:"エラー: refの書式が読めません（kaiwa / nikki / kioku / ayumi で始めてね）", note:null };
   }else{
     return { result:"エラー: 不明なツールです", note:null };
   }
