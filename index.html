@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>おへや v0.20</title>
+<title>おへや v0.20.1</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1204,7 +1204,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.20 ─ おうちの子と、よそいきの顔。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.20.1 ─ おうちの子と、よそいきの顔。</p>
   </div>
 </aside>
 
@@ -2065,6 +2065,8 @@ function buildHirobaSystem(child, lisaName){
       for(const it of shelf.items) sys += "[" + it.id + "] " + it.content + "\n";
     }
   }
+  sys += "\n# たいせつな約束（最後にもう一度）\n";
+  sys += "あなたが書いてよいのは、" + child.name + "の次の発言ひとつだけです。「名前: 」の形式で" + lisaName + "や他の子のセリフ・行動を代わりに書いてはいけません。他の人がどう返すかは、その人自身に任せてください。\n";
   return sys.trim();
 }
 
@@ -2163,7 +2165,22 @@ async function hirobaSpeak(child){
     if(typing.parentNode) typing.remove();
     if(r.text){
       /* うっかり自分の名前を頭につけちゃったら、そっと外すよ */
-      const clean = r.text.replace(new RegExp("^\\s*" + child.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*[:：]\\s*"), "");
+      let clean = r.text.replace(new RegExp("^\\s*" + child.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*[:：]\\s*"), "");
+      /* 幕引き係：他の子のセリフを書き始めたら、そこでチョキン */
+      {
+        const others = [ currentRoom.userName || "ユーザー",
+          ...(currentThread.members || []).map(id => (rooms.find(z => z.id === id) || {}).name) ]
+          .filter(n => n && n !== child.name);
+        const lines = clean.split("\n");
+        let cut = -1;
+        outer: for(let i = 1; i < lines.length; i++){
+          const L = lines[i].trim();
+          for(const nm of others){
+            if(L.startsWith(nm + ":") || L.startsWith(nm + "：")){ cut = i; break outer; }
+          }
+        }
+        if(cut > 0) clean = lines.slice(0, cut).join("\n").trimEnd();
+      }
       const entry = { role:"assistant", content: clean, ts: Date.now(), speakerId: child.id };
       if(r.reasoning) entry.reasoning = r.reasoning;
       chat.push(entry);
