@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>おへや v0.15</title>
+<title>おへや v0.16</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -135,6 +135,12 @@
   .world-card .wsw{display:flex;gap:4px}
   .world-card .wsw i{width:16px;height:16px;border-radius:50%;border:1px solid rgba(0,0,0,.18)}
   .world-card:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+  /* バックアップのお知らせ */
+  #backupNudge{display:none;margin:12px 14px 0;padding:12px 14px;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+  #backupNudge.show{display:block}
+  #backupNudge p{font-size:13px;color:var(--text);margin-bottom:10px;line-height:1.65}
+  #backupNudge .row{display:flex;gap:8px}
 
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
@@ -859,6 +865,7 @@
     <button class="iconbtn" id="searchBtn" title="さがしもの（全部屋けんさく）">🔍</button>
     <button class="iconbtn" id="globalSettingsBtn" title="全体設定">⚙️</button>
   </header>
+  <div id="backupNudge"></div>
   <div id="lobbyList"></div>
   <button id="addRoomBtn">＋ 新しい部屋</button>
 </div>
@@ -1123,6 +1130,9 @@
         <button class="btn" id="backupBtn">💾 バックアップを保存</button>
         <button class="btn" id="restoreBtn">📥 復元する</button>
       </div>
+      <div class="row">
+        <p class="hint" id="backupHint" style="margin-top:6px"></p>
+      </div>
       <input type="file" id="restoreInput" accept=".json,application/json" hidden>
       <p class="hint">全部屋の会話・記憶の棚・日記帳・あゆみ帳・アルバム・写真・プロフィールを1つのファイルに保存するよ（APIキーは入れないから、ファイルを人に見られても安心）。ときどき保存して、大事な場所にしまっておいてね。復元すると、今この端末にあるデータは置きかわるよ。</p>
       <div class="credits" id="backupMsg" style="display:none"></div>
@@ -1133,7 +1143,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.15 ─ おもいでは、ひろびろ「くら」のなかへ。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.16 ─ おもいでに、お守りを。</p>
   </div>
 </aside>
 
@@ -1704,6 +1714,7 @@ function showScreen(name){
 
 function renderLobby(){
   $("lamp").classList.toggle("on", !!global.apiKey);
+  renderBackupNudge();
   const list = $("lobbyList");
   list.innerHTML = "";
   if(rooms.length === 0){
@@ -3201,6 +3212,7 @@ async function renderStorageMeter(){
 }
 $("globalSettingsBtn").onclick = () => {
   $("apiKey").value = global.apiKey;
+  renderBackupHint();
   renderWorldGrid();
   renderStorageMeter();
   openPanel($("globalPanel"));
@@ -3276,8 +3288,8 @@ function backupMsg(text){
   box.style.display = "block";
   box.textContent = text;
 }
-$("backupBtn").onclick = async () => {
-  if(rooms.length === 0){ backupMsg("まだ部屋がないから、保存するものがないよ。"); return; }
+async function doBackup(){
+  if(rooms.length === 0){ backupMsg("まだ部屋がないから、保存するものがないよ。"); return false; }
   backupMsg("お守りを用意してるよ…");
   const data = await makeBackup();
   const d = new Date();
@@ -3289,8 +3301,56 @@ $("backupBtn").onclick = async () => {
   a.download = "oheya_backup_" + stamp + ".json";
   a.click();
   URL.revokeObjectURL(a.href);
+  /* お守りを作った日を覚えておくよ */
+  global.lastBackupAt = Date.now();
+  delete global.backupNudgeSnoozeUntil;
+  save(LS_GLOBAL, global);
+  renderBackupHint();
   backupMsg("バックアップを保存したよ（" + rooms.length + "部屋・アルバム" + data.albums.length + "枚）。大事な場所にしまっておいてね。");
-};
+  return true;
+}
+$("backupBtn").onclick = doBackup;
+
+/* ---------- バックアップのお知らせ ---------- */
+function backupNudgeState(){
+  if(!rooms.length) return null;
+  /* 会話がまだ少ないうちは静かにしてるよ */
+  let chatChars = 0;
+  memCache.forEach((v, k) => { if(k.startsWith("oheya_chat_")) chatChars += (v || "").length; });
+  if(chatChars < 20000) return null;
+  const now = Date.now();
+  if(global.backupNudgeSnoozeUntil && now < global.backupNudgeSnoozeUntil) return null;
+  if(!global.lastBackupAt) return { kind: "first" };
+  const days = Math.floor((now - global.lastBackupAt) / 86400000);
+  if(days >= 14) return { kind: "since", days };
+  return null;
+}
+function renderBackupNudge(){
+  const box = $("backupNudge");
+  const st = backupNudgeState();
+  if(!st){ box.classList.remove("show"); box.innerHTML = ""; return; }
+  const msg = st.kind === "first"
+    ? "🧸 みんなとの思い出、まだ一度もバックアップしてないみたい。ブラウザのデータが消えると思い出も一緒に消えちゃうから、お守りを作っておかない？"
+    : "🧸 さいごのバックアップから" + st.days + "日。思い出も増えてきた頃だし、新しいお守りを作っておかない？";
+  box.innerHTML = '<p>' + msg + '</p><div class="row">' +
+    '<button class="btn primary" id="nudgeBackupBtn">💾 いまバックアップ</button>' +
+    '<button class="btn" id="nudgeLaterBtn">また今度ね</button></div>';
+  $("nudgeBackupBtn").onclick = async () => { await doBackup(); renderBackupNudge(); };
+  $("nudgeLaterBtn").onclick = () => {
+    global.backupNudgeSnoozeUntil = Date.now() + 7 * 86400000; /* 7日おやすみ */
+    save(LS_GLOBAL, global);
+    renderBackupNudge();
+  };
+  box.classList.add("show");
+}
+function renderBackupHint(){
+  const el = $("backupHint");
+  if(!el) return;
+  if(!global.lastBackupAt){ el.textContent = "さいごのバックアップ：まだないよ"; return; }
+  const days = Math.floor((Date.now() - global.lastBackupAt) / 86400000);
+  el.textContent = "さいごのバックアップ：" + (days === 0 ? "今日" : days + "日前") +
+    "（" + new Date(global.lastBackupAt).toLocaleDateString("ja-JP") + "）";
+}
 $("restoreBtn").onclick = () => $("restoreInput").click();
 $("restoreInput").addEventListener("change", () => {
   const file = $("restoreInput").files[0];
@@ -3344,6 +3404,10 @@ $("restoreInput").addEventListener("change", () => {
         }
       }
     }catch(e){ albumTrouble = true; }
+    /* 復元したてはお守り（バックアップファイル）が手元にあるはずだから、日付をつけておくよ */
+    global.lastBackupAt = Date.now();
+    delete global.backupNudgeSnoozeUntil;
+    save(LS_GLOBAL, global);
     await flushWrites(); /* くらへの書き込みを見届けてからおやすみ */
     alert("おかえりなさい、みんな。復元できたよ（" + rooms.length + "部屋）。" +
       (photoTrouble ? "\n（写真の一部は保存領域が足りなくて戻せなかったみたい…）" : "") +
@@ -3616,7 +3680,7 @@ $("threadNewBtn").onclick = startNewThread;
 renderLobby();
 
 /* デバッグの窓：困ったときにフェイブルが中を覗くためのもの。ふだんは触らなくて大丈夫 */
-window.__oheya = { load, save, del, loadRaw, saveRaw, memCache, makeBackup, flushWrites, applyWorldTheme, openRoom, kvClear };
+window.__oheya = { load, save, del, loadRaw, saveRaw, memCache, makeBackup, flushWrites, applyWorldTheme, openRoom, kvClear, backupNudgeState, renderBackupNudge, doBackup, renderLobby, get global(){ return global; }, get rooms(){ return rooms; } };
 })();
 </script>
 </body>
