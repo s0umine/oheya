@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>おへや v0.14</title>
+<title>おへや v0.15</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1133,7 +1133,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.14 ─ きせかえて、どんなせかいでも。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.15 ─ おもいでは、ひろびろ「くら」のなかへ。</p>
   </div>
 </aside>
 
@@ -1168,6 +1168,7 @@
 </aside>
 
 <script>
+(async () => {
 "use strict";
 
 /* ---------- ストレージ ---------- */
@@ -1180,11 +1181,47 @@ const shelfKey  = id => "oheya_shelf_v2_" + id;
 const diaryKey  = id => "oheya_diary_v2_" + id;
 const ayumiKey  = id => "oheya_ayumi_v1_" + id;
 
-function load(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
-function loadRaw(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
-function save(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
-function saveRaw(k,v){ try{ localStorage.setItem(k, v); return true; }catch(e){ return false; } }
-function del(k){ try{ localStorage.removeItem(k); }catch(e){} }
+/* ---------- データのおうち ----------
+   大物（会話・記憶の棚・日記・あゆみ・顔写真）は「くら」（IndexedDB・GB級）、
+   小物（部屋リスト・全体設定）は「たんす」（localStorage）に住むよ。
+   くらの中身は起動時にぜんぶ机（memCache）へ広げるから、読み書きは今まで通りの速さ */
+const BIG_PREFIXES = ["oheya_chat_v3_", "oheya_chat_v2_", "oheya_shelf_v2_", "oheya_diary_v2_", "oheya_ayumi_v1_", "oheya_avatar_v2_"];
+function isBigKey(k){ return typeof k === "string" && BIG_PREFIXES.some(p => k.startsWith(p)); }
+const memCache = new Map();          /* くらの中身（文字列のまま） */
+const pendingWrites = new Set();     /* まだ書き込み中のくら作業 */
+function trackWrite(p){
+  pendingWrites.add(p);
+  p.catch(e => console.error("くらへの書き込みに失敗…", e)).finally(() => pendingWrites.delete(p));
+  return p;
+}
+/* リロードの前に呼んでね：くらへの書き込みが全部終わるのを見届けるよ */
+async function flushWrites(){ await Promise.allSettled([...pendingWrites]); }
+
+function load(k){
+  const s = isBigKey(k) ? (memCache.has(k) ? memCache.get(k) : null) : (function(){ try{ return localStorage.getItem(k); }catch(e){ return null; } })();
+  try{ return JSON.parse(s); }catch(e){ return null; }
+}
+function loadRaw(k){
+  if(isBigKey(k)) return memCache.has(k) ? memCache.get(k) : null;
+  try{ return localStorage.getItem(k); }catch(e){ return null; }
+}
+function save(k,v){ return saveRaw(k, JSON.stringify(v)); }
+function saveRaw(k,v){
+  if(isBigKey(k)){
+    memCache.set(k, v);
+    trackWrite(kvPut(k, v));
+    return true;
+  }
+  try{ localStorage.setItem(k, v); return true; }catch(e){ return false; }
+}
+function del(k){
+  if(isBigKey(k)){
+    memCache.delete(k);
+    trackWrite(kvDel(k));
+    return;
+  }
+  try{ localStorage.removeItem(k); }catch(e){}
+}
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
 let global = load(LS_GLOBAL) || { apiKey:"" };
@@ -1366,7 +1403,7 @@ let idbPromise = null;
 function openIDB(){
   if(idbPromise) return idbPromise;
   idbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open("oheya_idb_v1", 2);
+    const req = indexedDB.open("oheya_idb_v1", 3);
     req.onupgradeneeded = () => {
       const db = req.result;
       if(!db.objectStoreNames.contains("album")){
@@ -1376,6 +1413,9 @@ function openIDB(){
       if(!db.objectStoreNames.contains("chatimg")){
         const st2 = db.createObjectStore("chatimg", { keyPath: "id" });
         st2.createIndex("roomId", "roomId", { unique: false });
+      }
+      if(!db.objectStoreNames.contains("kv")){
+        db.createObjectStore("kv"); /* 会話・棚・日記・あゆみ・顔写真のおうち */
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -1415,6 +1455,52 @@ async function imgDeleteRoom(roomId){
   const items = await idbReq("chatimg", "readonly", st => st.index("roomId").getAll(roomId)) || [];
   if(!items.length) return;
   await idbReq("chatimg", "readwrite", st => { for(const it of items) st.delete(it.id); });
+}
+
+/* ---------- くらの読み書き（kvストア） ---------- */
+function kvPut(k, v){ return idbReq("kv", "readwrite", st => st.put(v, k)); }
+function kvDel(k){ return idbReq("kv", "readwrite", st => st.delete(k)); }
+function kvClear(){ return idbReq("kv", "readwrite", st => st.clear()); }
+
+/* 起動時：くらの中身をぜんぶ机に広げるよ */
+async function kvLoadAll(){
+  const keys = await idbReq("kv", "readonly", st => st.getAllKeys()) || [];
+  const vals = await idbReq("kv", "readonly", st => st.getAll()) || [];
+  for(let i = 0; i < keys.length; i++) memCache.set(keys[i], vals[i]);
+}
+
+/* たんすに残っている大物を、くらへお引越しするよ（初回だけ）。
+   コピー → 無事を確認 → たんすを空ける、の安全な順番で */
+async function migrateToKura(){
+  const moving = [];
+  try{
+    for(let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if(isBigKey(k)) moving.push(k);
+    }
+  }catch(e){ return; }
+  if(!moving.length) return;
+  for(const k of moving){
+    const v = localStorage.getItem(k);
+    if(v === null) continue;
+    await kvPut(k, v);
+    memCache.set(k, v);
+  }
+  const arrived = new Set(await idbReq("kv", "readonly", st => st.getAllKeys()) || []);
+  let done = 0;
+  for(const k of moving){
+    if(arrived.has(k)){ try{ localStorage.removeItem(k); done++; }catch(e){} }
+  }
+  console.log("たんす→くらのお引越し完了：" + done + "件");
+}
+
+/* ここでくらを開けて、机に広げてから、おへやが始まるよ */
+try{
+  await kvLoadAll();
+  await migrateToKura();
+}catch(e){
+  console.error("くらが開けられなかった…", e);
+  alert("ブラウザの保存領域（IndexedDB）が開けなかったよ。プライベートモードだと使えないことがあるの。通常モードで開いてみてね。");
 }
 
 /* ---------- 状態 ---------- */
@@ -3094,16 +3180,19 @@ async function renderStorageMeter(){
     }
   }catch(e){}
   const lsMB = lsBytes / 1048576;
-  const pct = Math.min(100, Math.round(lsMB / 5 * 100));
-  let html = "📦 たんす（会話・記憶・日記・あゆみ・顔写真）<br><b>" + lsMB.toFixed(2) + " MB</b> / 約5 MB（" + pct + "%つかってる）";
-  if(pct >= 80) html += "<br>そろそろいっぱいかも…フェイブルにお引越しの相談をしてね。";
+  let kuraChars = 0;
+  memCache.forEach(v => { kuraChars += (v || "").length; });
+  const kuraMB = kuraChars * 2 / 1048576;
+  let html = "📦 たんす（部屋リスト・設定などの小物）<br><b>" + lsMB.toFixed(2) + " MB</b> / 約5 MB";
+  html += "<br><br>📜 くらの中の おしゃべり・記憶・日記・あゆみ・顔写真<br><b>" +
+    (kuraMB < 0.01 && kuraChars > 0 ? "0.01未満" : kuraMB.toFixed(2)) + " MB</b>";
   /* くら（IndexedDB）：ブラウザに聞いてみる */
   if(navigator.storage && navigator.storage.estimate){
     try{
       const est = await navigator.storage.estimate();
       const usedMB = (est.usage || 0) / 1048576;
       const quotaGB = (est.quota || 0) / 1073741824;
-      html += "<br><br>🏛 くら（アルバムなど・ブラウザ全体）<br><b>" +
+      html += "<br><br>🏛 くら全体のようす（アルバム・写真ふくむ）<br><b>" +
         (usedMB < 100 ? usedMB.toFixed(1) : Math.round(usedMB)) + " MB</b> / 約" +
         (quotaGB >= 1 ? quotaGB.toFixed(1) + " GB" : Math.round(quotaGB*1024) + " MB") + " まで";
     }catch(e){}
@@ -3133,8 +3222,10 @@ $("wipeBtn").onclick = async () => {
     for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); }
     del(LS_ROOMS); del(LS_GLOBAL);
     del("oheya_settings_v1"); del("oheya_chat_v1");
+    try{ await kvClear(); }catch(e){}
     try{ await albumClear(); }catch(e){}
     try{ await imgClear(); }catch(e){}
+    await flushWrites();
     location.reload();
   }
 };
@@ -3253,6 +3344,7 @@ $("restoreInput").addEventListener("change", () => {
         }
       }
     }catch(e){ albumTrouble = true; }
+    await flushWrites(); /* くらへの書き込みを見届けてからおやすみ */
     alert("おかえりなさい、みんな。復元できたよ（" + rooms.length + "部屋）。" +
       (photoTrouble ? "\n（写真の一部は保存領域が足りなくて戻せなかったみたい…）" : "") +
       (albumTrouble ? "\n（アルバムの一部は戻せなかったみたい…）" : ""));
@@ -3522,6 +3614,10 @@ $("threadNewBtn").onclick = startNewThread;
 
 /* ---------- 初期化 ---------- */
 renderLobby();
+
+/* デバッグの窓：困ったときにフェイブルが中を覗くためのもの。ふだんは触らなくて大丈夫 */
+window.__oheya = { load, save, del, loadRaw, saveRaw, memCache, makeBackup, flushWrites, applyWorldTheme, openRoom, kvClear };
+})();
 </script>
 </body>
 </html>
