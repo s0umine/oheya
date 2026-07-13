@@ -315,7 +315,7 @@
     padding:18px 14px 10px;
     display:flex;flex-direction:column;gap:14px;
   }
-  .arow{display:flex;flex-direction:column;gap:6px;max-width:100%;align-self:stretch}
+  .arow{display:flex;flex-direction:column;gap:6px;max-width:92%;align-self:flex-start;width:92%}
   .msg{line-height:var(--msglh,1.75);font-size:var(--msgfs,15px);white-space:pre-wrap;word-break:break-word;min-width:0}
   .msg.assistant{
     background:var(--paper);color:var(--ink);
@@ -466,7 +466,7 @@
     flex:1;resize:none;
     background:var(--surface);color:var(--text);
     border:1px solid var(--line);border-radius:14px;
-    padding:11px 14px;font-size:15px;line-height:1.6;
+    padding:11px 14px;font-size:16px;line-height:1.6;
     font-family:var(--font-body);
     max-height:140px;min-height:44px;
   }
@@ -1257,7 +1257,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.21 ─ 小さなボタンと、ひろい行間。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.21.1 ─ 指を離しても、采配は続く。</p>
   </div>
 </aside>
 
@@ -1868,13 +1868,31 @@ function startEditUser(i){
   cancel.className = "btn"; cancel.textContent = "やめる";
   cancel.onclick = () => renderChat();
   const ok = document.createElement("button");
-  ok.className = "btn primary"; ok.textContent = "保存する";
+  ok.className = "btn"; ok.textContent = "保存だけ";
   ok.onclick = () => {
     const v = ta.value.trim();
     if(v){ chat[i].content = v; saveChat(); }
     renderChat();
   };
   row.appendChild(cancel); row.appendChild(ok);
+  /* 最後の自分の発言なら「保存して返事をやり直す」も出すよ（個室のみ） */
+  let isLastUser = false;
+  for(let j = chat.length - 1; j >= 0; j--){
+    if(chat[j].role === "user"){ isLastUser = (j === i); break; }
+  }
+  if(isLastUser && !currentRoom.isHiroba){
+    const okr = document.createElement("button");
+    okr.className = "btn primary"; okr.textContent = "保存して返事をやり直す";
+    okr.onclick = async () => {
+      const v = ta.value.trim();
+      if(!v){ renderChat(); return; }
+      chat[i].content = v;
+      chat.splice(i + 1);
+      saveChat(); renderChat();
+      await sendText(v, null, null, { regen:true });
+    };
+    row.appendChild(okr);
+  }
   wrap.appendChild(ta); wrap.appendChild(row);
   bubble.replaceWith(wrap);
   ta.focus();
@@ -2101,13 +2119,19 @@ function renderSpeakerBar(){
   ob.disabled = sending && !omakaseRunning;
   ob.oncontextmenu = e => e.preventDefault();
   ob.style.touchAction = "none";
-  let lpT = null, lpF = false;
+  /* このボタン自身で押し始めた指かどうかを覚えておく。
+     長押し成立→バーが作り直される→離した指が新しい✋に落ちて
+     「とめる」扱いになる事故を防ぐよ */
+  let lpT = null, lpF = false, pressedHere = false;
   ob.onpointerdown = () => {
+    pressedHere = true;
     if(omakaseRunning) return;
     lpF = false;
     lpT = setTimeout(() => { lpF = true; omakaseRun(3); }, 500);
   };
   ob.onpointerup = () => {
+    if(!pressedHere) return;
+    pressedHere = false;
     if(omakaseRunning && !lpF){
       omakaseStop = true;
       ob.innerHTML = '<span class="avatar">🎠</span>とまるよ…';
@@ -2117,7 +2141,7 @@ function renderSpeakerBar(){
     if(!lpF) omakaseRun(1);
   };
   ob.onpointerleave = () => clearTimeout(lpT);
-  ob.onpointercancel = () => clearTimeout(lpT);
+  ob.onpointercancel = () => { clearTimeout(lpT); pressedHere = false; };
   bar.appendChild(ob);
 
   for(const m of members){
@@ -4191,13 +4215,20 @@ $("lhRange").oninput = () => {
   save(LS_GLOBAL, global); applyTextPrefs(); renderTextPrefs();
 };
 applyTextPrefs();
-/* ---------- v0.21 キーボードで入力欄が隠れないように ---------- */
+/* ---------- v0.21.1 キーボードで入力欄が隠れないように ---------- */
 if(window.visualViewport){
+  const vv = window.visualViewport;
   let vvT = null;
-  window.visualViewport.addEventListener("resize", () => {
-    document.body.style.height = window.visualViewport.height + "px";
+  const fitViewport = () => {
+    document.body.style.height = vv.height + "px";
+    /* iOSがフォーカス欄を見せようと勝手にページをずらすので、毎回打ち消す */
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
     clearTimeout(vvT); vvT = setTimeout(scrollBottom, 80);
-  });
+  };
+  vv.addEventListener("resize", fitViewport);
+  vv.addEventListener("scroll", fitViewport);
+  inputEl.addEventListener("focus", () => { setTimeout(fitViewport, 250); });
 }
 $("wipeBtn").onclick = async () => {
   if(confirm("全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーを、この端末から全部消すよ。本当にいい?")){
