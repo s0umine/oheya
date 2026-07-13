@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
 <title>おへや v0.20.1</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
@@ -147,9 +147,10 @@
   body{
     font-family:var(--font-body);
     background:var(--bg);color:var(--text);
+    position:fixed;inset:0;width:100%;overflow:hidden;
     height:100dvh;overscroll-behavior:none;
   }
-  .screen{display:none;flex-direction:column;height:100dvh;position:relative}
+  .screen{display:none;flex-direction:column;height:100%;position:relative}
   .screen.active{display:flex}
 
   /* ---------- 部屋メニュー（☰） ---------- */
@@ -314,9 +315,8 @@
     padding:18px 14px 10px;
     display:flex;flex-direction:column;gap:14px;
   }
-  .arow{display:flex;gap:8px;align-items:flex-end;max-width:92%;align-self:flex-start}
-  .arow .avatar{width:30px;height:30px;font-size:16px;margin-bottom:2px}
-  .msg{line-height:1.75;font-size:15px;white-space:pre-wrap;word-break:break-word;min-width:0}
+  .arow{display:flex;flex-direction:column;gap:6px;max-width:100%;align-self:stretch}
+  .msg{line-height:var(--msglh,1.75);font-size:var(--msgfs,15px);white-space:pre-wrap;word-break:break-word;min-width:0}
   .msg.assistant{
     background:var(--paper);color:var(--ink);
     border-radius:4px var(--radius) var(--radius) var(--radius);
@@ -342,7 +342,7 @@
   }
   .meta{
     align-self:flex-start;font-size:11px;color:var(--muted);
-    margin-top:-8px;padding-left:42px;
+    margin-top:-8px;padding-left:4px;
   }
   .msg.assistant code{
     background:rgba(58,50,67,.1);border-radius:4px;padding:1px 5px;
@@ -364,7 +364,7 @@
   .copybtn:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
   .thought{
     max-width:92%;align-self:flex-start;
-    margin-left:38px;
+    margin-left:4px;
   }
   .thought details{
     background:var(--surface);border:1px dashed var(--line);
@@ -397,7 +397,7 @@
   .welcome .avatar{width:84px;height:84px;font-size:42px}
 
   footer{
-    flex-shrink:0;
+    position:relative;flex-shrink:0;
     padding:10px 12px calc(env(safe-area-inset-bottom) + 10px);
     background:linear-gradient(0deg,var(--bg-grad),var(--bg));
     border-top:1px solid var(--line);
@@ -429,6 +429,39 @@
     max-width:min(100%,260px);border-radius:10px;display:block;
     margin-bottom:6px;background:rgba(0,0,0,.2);
   }
+  /* ---------- v0.21 発言まわりの小物 ---------- */
+  .ahead{display:flex;align-items:center;gap:8px}
+  .ahead .avatar{width:30px;height:30px;font-size:16px}
+  .ahead .sname{margin:0;font-size:12.5px}
+  .amline{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;
+    font-size:10.5px;color:var(--muted);padding-left:4px;margin-top:-4px}
+  .umline{align-self:flex-end;display:flex;gap:12px;align-items:center;
+    font-size:10.5px;color:var(--muted);margin-top:-10px;padding-right:4px}
+  .mbtn{background:none;border:none;color:var(--muted);cursor:pointer;
+    font-size:13px;padding:0 2px;line-height:1;font-family:var(--font-body)}
+  .mbtn:hover{color:var(--text)}
+  .mbtn:focus-visible{outline:2px solid var(--lamp);outline-offset:2px;border-radius:4px}
+  .txtchip{display:inline-flex;align-items:center;gap:6px;
+    background:rgba(0,0,0,.12);border-radius:8px;padding:4px 8px;
+    font-size:12px;margin-bottom:6px;max-width:100%;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .uedit{align-self:flex-end;width:92%;display:flex;flex-direction:column;gap:8px}
+  .uedit textarea{resize:vertical;min-height:90px;background:var(--surface);
+    color:var(--text);border:1px solid var(--line);border-radius:12px;
+    padding:10px 12px;font-family:var(--font-body);font-size:14px;line-height:1.6}
+  #speakerBar .spk{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  #attachMenu{position:absolute;bottom:calc(100% + 6px);left:10px;z-index:9;
+    background:var(--surface2);border:1px solid var(--line);border-radius:12px;
+    padding:6px;display:flex;flex-direction:column;gap:2px;
+    box-shadow:0 6px 18px rgba(0,0,0,.3)}
+  #attachMenu[hidden]{display:none}
+  #attachMenu button{background:none;border:none;color:var(--text);
+    padding:10px 14px;text-align:left;font-size:14px;cursor:pointer;
+    border-radius:8px;font-family:var(--font-body)}
+  #attachMenu button:hover{background:var(--surface)}
+  #attachIcon{width:40px;height:40px;display:flex;align-items:center;
+    justify-content:center;font-size:20px;flex-shrink:0}
+  #attachIcon[hidden]{display:none}
   #input{
     flex:1;resize:none;
     background:var(--surface);color:var(--text);
@@ -946,15 +979,21 @@
     <div id="speakerBar" hidden></div>
     <div id="attachChip" hidden>
       <img id="attachThumb" alt="">
+      <span id="attachIcon" hidden>📄</span>
       <span id="attachName"></span>
       <button id="attachRemove" aria-label="添付を外す" title="添付を外す">✕</button>
     </div>
+    <div id="attachMenu" hidden>
+      <button id="attachImgBtn">🖼 画像を見せる</button>
+      <button id="attachTxtBtn">📄 テキストファイルを渡す</button>
+    </div>
     <div class="composer-row">
-      <button id="attachBtn" title="画像を見せる" aria-label="画像を添付">🖼</button>
+      <button id="attachBtn" title="ファイルを渡す" aria-label="ファイルを添付">＋</button>
       <textarea id="input" rows="1" placeholder="メッセージを書く…" aria-label="メッセージ入力"></textarea>
       <button id="send">送る</button>
     </div>
     <input type="file" id="imgInput" accept="image/*" hidden>
+    <input type="file" id="txtInput" accept=".txt,.md,.markdown,.json,.csv,.tsv,.log,.html,.css,.js,.py,text/*" hidden>
   </footer>
 </div>
 
@@ -1181,6 +1220,20 @@
       <p class="hint">おへや全体の世界観が変わるよ。各部屋の「お部屋のあかり」はそのまま生きるから、組み合わせも楽しんでね。</p>
     </div>
     <div class="field" style="margin-top:28px">
+      <label>🔤 チャットの文字</label>
+      <div class="row" style="align-items:center;gap:10px">
+        <span class="hint" style="flex:0 0 5.5em">文字サイズ</span>
+        <input type="range" id="fsRange" min="12" max="18" step="0.5" style="flex:1">
+        <span class="hint" id="fsVal" style="flex:0 0 3.5em;text-align:right"></span>
+      </div>
+      <div class="row" style="align-items:center;gap:10px;margin-top:6px">
+        <span class="hint" style="flex:0 0 5.5em">行間</span>
+        <input type="range" id="lhRange" min="1.3" max="2.1" step="0.05" style="flex:1">
+        <span class="hint" id="lhVal" style="flex:0 0 3.5em;text-align:right"></span>
+      </div>
+      <p class="hint">みんなの発言の文字の大きさと、行のつまり具合を変えられるよ。動かすとすぐ反映されるから、好みのところを探してね。</p>
+    </div>
+    <div class="field" style="margin-top:28px">
       <label>保存領域のようす</label>
       <div class="credits" id="storageMeter">計測中…</div>
       <p class="hint">たんす（localStorage）は約5MBの小物入れ。いっぱいに近づいたら教えてね、お引越しを考えよう。</p>
@@ -1204,7 +1257,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.20.1 ─ おうちの子と、よそいきの顔。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.21 ─ 小さなボタンと、ひろい行間。</p>
   </div>
 </aside>
 
@@ -1641,35 +1694,37 @@ function renderMd(src){
   return s;
 }
 
-function addBubble(role, content, usage, imgId, speaker){
+function addBubble(role, content, usage, imgId, speaker, entry){
   let bubble;
   if(role === "assistant"){
     const row = document.createElement("div");
     row.className = "arow";
+    const head = document.createElement("div");
+    head.className = "ahead";
     const av = document.createElement("span");
     av.className = "avatar";
     const who = speaker || currentRoom;
     if(who) avatarInto(av, who);
+    const nm = document.createElement("span");
+    nm.className = "sname";
+    nm.textContent = (who && who.name) || "";
+    head.appendChild(av); head.appendChild(nm);
     bubble = document.createElement("div");
     bubble.className = "msg assistant";
     bubble.innerHTML = renderMd(content);
     bubble.style.whiteSpace = "normal";
-    row.appendChild(av);
-    if(speaker){
-      const col = document.createElement("div");
-      const nm = document.createElement("span");
-      nm.className = "sname";
-      nm.textContent = speaker.name;
-      col.appendChild(nm); col.appendChild(bubble);
-      row.appendChild(col);
-    }else{
-      row.appendChild(bubble);
-    }
+    row.appendChild(head);
+    row.appendChild(bubble);
     chatEl.appendChild(row);
-    if(usage) addMeta(usage);
   }else{
     bubble = document.createElement("div");
     bubble.className = "msg " + role;
+    if(entry && entry.txtName){
+      const chip = document.createElement("div");
+      chip.className = "txtchip";
+      chip.textContent = "📄 " + entry.txtName;
+      bubble.appendChild(chip);
+    }
     if(imgId){
       const im = document.createElement("img");
       im.className = "chatimg";
@@ -1683,13 +1738,11 @@ function addBubble(role, content, usage, imgId, speaker){
         else im.remove();
       }).catch(() => im.remove());
       bubble.appendChild(im);
-      if(content){
-        const t = document.createElement("div");
-        t.textContent = content;
-        bubble.appendChild(t);
-      }
-    }else{
-      bubble.textContent = content;
+    }
+    if(content){
+      const t = document.createElement("div");
+      t.textContent = content;
+      bubble.appendChild(t);
     }
     chatEl.appendChild(bubble);
   }
@@ -1726,6 +1779,124 @@ function addThought(text, open){
   chatEl.appendChild(wrap);
   scrollBottom();
   return wrap;
+}
+/* ---------- v0.21 発言の小物（日時・コピー・編集・再生成） ---------- */
+function fmtTs(ts){
+  if(!ts) return "";
+  const d = new Date(ts);
+  return (d.getMonth()+1) + "/" + d.getDate() + " " +
+    String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+}
+function miniBtn(glyph, title, fn){
+  const b = document.createElement("button");
+  b.className = "mbtn";
+  b.textContent = glyph;
+  b.title = title;
+  b.setAttribute("aria-label", title);
+  b.onclick = fn;
+  return b;
+}
+function copyToClip(text, btn){
+  const done = ok => {
+    const org = btn.textContent;
+    btn.textContent = ok ? "✓" : "✕";
+    setTimeout(() => { btn.textContent = org; }, 1200);
+  };
+  const fallback = () => {
+    try{
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove(); done(ok);
+    }catch(err){ done(false); }
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(() => done(true), fallback);
+  }else fallback();
+}
+function lastAssistantIndex(){
+  for(let i = chat.length - 1; i >= 0; i--){ if(chat[i].role === "assistant") return i; }
+  return -1;
+}
+function assistMetaLine(m, i){
+  const line = document.createElement("div");
+  line.className = "amline";
+  const bits = [];
+  if(m.ts) bits.push(fmtTs(m.ts));
+  if(m.model) bits.push(String(m.model).split("/").pop());
+  if(m.usage){
+    const t = (m.usage.total_tokens ?? ((m.usage.prompt_tokens||0)+(m.usage.completion_tokens||0)));
+    const c = (typeof m.usage.cost === "number") ? " $" + m.usage.cost.toFixed(5) : "";
+    bits.push(t + " tok" + c);
+  }
+  if(bits.length){
+    const info = document.createElement("span");
+    info.textContent = bits.join(" ・ ");
+    line.appendChild(info);
+  }
+  line.appendChild(miniBtn("⧉", "この発言をコピー", e => copyToClip(m.content, e.currentTarget)));
+  if(i === lastAssistantIndex()){
+    line.appendChild(miniBtn("↻", "もう一度考えてもらう", () => regenLast()));
+  }
+  return line;
+}
+function userMetaLine(m, i){
+  const line = document.createElement("div");
+  line.className = "umline";
+  if(m.ts){
+    const info = document.createElement("span");
+    info.textContent = fmtTs(m.ts);
+    line.appendChild(info);
+  }
+  line.appendChild(miniBtn("✎", "この発言を書き直す", () => startEditUser(i)));
+  line.appendChild(miniBtn("⧉", "この発言をコピー", e => copyToClip(m.content, e.currentTarget)));
+  return line;
+}
+function startEditUser(i){
+  if(sending || omakaseRunning) return;
+  const bubble = chatEl.querySelector('.msg.user[data-ci="' + i + '"]');
+  if(!bubble || !chat[i]) return;
+  const wrap = document.createElement("div");
+  wrap.className = "uedit";
+  const ta = document.createElement("textarea");
+  ta.value = chat[i].content;
+  const row = document.createElement("div");
+  row.className = "row";
+  row.style.justifyContent = "flex-end";
+  const cancel = document.createElement("button");
+  cancel.className = "btn"; cancel.textContent = "やめる";
+  cancel.onclick = () => renderChat();
+  const ok = document.createElement("button");
+  ok.className = "btn primary"; ok.textContent = "保存する";
+  ok.onclick = () => {
+    const v = ta.value.trim();
+    if(v){ chat[i].content = v; saveChat(); }
+    renderChat();
+  };
+  row.appendChild(cancel); row.appendChild(ok);
+  wrap.appendChild(ta); wrap.appendChild(row);
+  bubble.replaceWith(wrap);
+  ta.focus();
+}
+async function regenLast(){
+  if(sending || omakaseRunning || !currentRoom) return;
+  const li = lastAssistantIndex();
+  if(li < 0) return;
+  if(currentRoom.isHiroba){
+    const child = rooms.find(r => r.id === chat[li].speakerId);
+    if(!child) return;
+    chat.splice(li);
+    saveChat(); renderChat();
+    await hirobaSpeak(child);
+  }else{
+    let lu = -1;
+    for(let i = chat.length - 1; i >= 0; i--){ if(chat[i].role === "user"){ lu = i; break; } }
+    if(lu < 0) return;
+    chat.splice(lu + 1);
+    saveChat(); renderChat();
+    await sendText(chat[lu].content, null, null, { regen:true });
+  }
 }
 /* コードブロックのコピーボタン（クリック委譲） */
 chatEl.addEventListener("click", e => {
@@ -1929,6 +2100,7 @@ function renderSpeakerBar(){
   ob.title = "タップ: ひとり采配 / 長押し: 続けて采配（最大3発言）";
   ob.disabled = sending && !omakaseRunning;
   ob.oncontextmenu = e => e.preventDefault();
+  ob.style.touchAction = "none";
   let lpT = null, lpF = false;
   ob.onpointerdown = () => {
     if(omakaseRunning) return;
@@ -1945,6 +2117,7 @@ function renderSpeakerBar(){
     if(!lpF) omakaseRun(1);
   };
   ob.onpointerleave = () => clearTimeout(lpT);
+  ob.onpointercancel = () => clearTimeout(lpT);
   bar.appendChild(ob);
 
   for(const m of members){
@@ -2001,16 +2174,20 @@ $("pickOk").onclick = () => {
 async function hirobaUserSend(text, image){
   if(chat.length === 0) chatEl.innerHTML = "";
   let imgId = null;
-  if(image){
+  if(image && image.kind !== "text"){
     imgId = uid();
     try{ await imgPut({ id: imgId, roomId: currentRoom.id, dataUrl: image.dataUrl, name: image.name || "" }); }
     catch(e){ imgId = null; }
   }
   const entry = { role:"user", content:text, ts:Date.now() };
   if(imgId){ entry.imgId = imgId; entry.imgName = image.name || ""; }
+  if(image && image.kind === "text"){ entry.txtName = image.name || "テキスト"; entry.txt = image.text || ""; }
   chat.push(entry);
   saveChat();
-  addBubble("user", text, null, imgId);
+  const el = addBubble("user", text, null, imgId, undefined, entry);
+  el.dataset.ci = chat.length - 1;
+  chatEl.appendChild(userMetaLine(entry, chat.length - 1));
+  scrollBottom();
 }
 
 /* 広間の台本を「この子の視点」に組み替えるよ */
@@ -2033,6 +2210,7 @@ function buildHirobaMessages(child){
       const who = m.role === "user" ? lisaName : ((rooms.find(r => r.id === m.speakerId) || {}).name || "だれか");
       let c = m.content;
       if(m.role === "user" && m.imgId) c += "\n（このとき画像を1枚見せてもらったけど、画像はその場かぎりで今は見えないよ）";
+      if(m.role === "user" && m.txt) c += "\n\n---\n📄 このとき渡されたテキストファイル「" + (m.txtName || "") + "」:\n" + m.txt;
       buf.push(who + ": " + c);
     }
   }
@@ -2181,12 +2359,12 @@ async function hirobaSpeak(child){
         }
         if(cut > 0) clean = lines.slice(0, cut).join("\n").trimEnd();
       }
-      const entry = { role:"assistant", content: clean, ts: Date.now(), speakerId: child.id };
+      const entry = { role:"assistant", content: clean, ts: Date.now(), speakerId: child.id, model: child.model };
       if(r.reasoning) entry.reasoning = r.reasoning;
+      if(r.usage) entry.usage = r.usage;
       chat.push(entry);
       saveChat();
-      if(bubble) bubble.innerHTML = renderMd(clean);
-      if(r.usage) addMeta(r.usage);
+      renderChat();
     }else{
       addError("お返事が空っぽで返ってきたみたい…もう一度試してみて。");
     }
@@ -2251,8 +2429,12 @@ function renderChat(){
     else{
       if(m.role === "assistant" && m.reasoning) addThought(m.reasoning, false);
       const spk = (m.speakerId && currentRoom && currentRoom.isHiroba) ? rooms.find(r => r.id === m.speakerId) : null;
-      const el = addBubble(m.role, m.content, m.usage, m.imgId, spk || undefined);
-      if(el) el.dataset.ci = i;
+      const el = addBubble(m.role, m.content, m.usage, m.imgId, spk || undefined, m);
+      if(el){
+        el.dataset.ci = i;
+        if(m.role === "assistant") el.parentNode.appendChild(assistMetaLine(m, i));
+        else if(m.role === "user") chatEl.appendChild(userMetaLine(m, i));
+      }
     }
   }
 }
@@ -2815,11 +2997,13 @@ async function callLLM(messages, tools){
 
 /* ---------- 送信 ---------- */
 /* ---------- 画像を見せる ---------- */
-let pendingImg = null; // { dataUrl, name }
+let pendingImg = null; // { kind:"image"|"text", dataUrl?, text?, name }
 function clearPendingImg(){
   pendingImg = null;
   $("attachChip").hidden = true;
   $("attachThumb").src = "";
+  $("attachThumb").hidden = false;
+  $("attachIcon").hidden = true;
 }
 function fileToChatImage(file){
   return new Promise((resolve, reject) => {
@@ -2836,22 +3020,30 @@ function fileToChatImage(file){
       ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, w, h);
       ctx.drawImage(img, 0, 0, w, h);
       URL.revokeObjectURL(url);
-      resolve({ dataUrl: cv.toDataURL("image/jpeg", 0.8), name: file.name || "" });
+      resolve({ kind: "image", dataUrl: cv.toDataURL("image/jpeg", 0.8), name: file.name || "" });
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("read")); };
     img.src = url;
   });
 }
-$("attachBtn").onclick = () => {
+$("attachBtn").onclick = (e) => {
   if(!currentRoom) return;
-  $("imgInput").click();
+  e.stopPropagation();
+  $("attachMenu").hidden = !$("attachMenu").hidden;
 };
+$("attachImgBtn").onclick = () => { $("attachMenu").hidden = true; $("imgInput").click(); };
+$("attachTxtBtn").onclick = () => { $("attachMenu").hidden = true; $("txtInput").click(); };
+document.addEventListener("click", (e) => {
+  if(!e.target.closest("#attachMenu") && !e.target.closest("#attachBtn")) $("attachMenu").hidden = true;
+});
 $("imgInput").addEventListener("change", async () => {
   const file = $("imgInput").files[0];
   $("imgInput").value = "";
   if(!file) return;
   try{
     pendingImg = await fileToChatImage(file);
+    $("attachThumb").hidden = false;
+    $("attachIcon").hidden = true;
     $("attachThumb").src = pendingImg.dataUrl;
     $("attachName").textContent = pendingImg.name || "画像";
     $("attachChip").hidden = false;
@@ -2860,19 +3052,40 @@ $("imgInput").addEventListener("change", async () => {
     alert("この画像は読み込めなかった…別の画像で試してみて。");
   }
 });
+$("txtInput").addEventListener("change", async () => {
+  const file = $("txtInput").files[0];
+  $("txtInput").value = "";
+  if(!file) return;
+  if(file.size > 200 * 1024){
+    alert("このファイルはちょっと大きいみたい（200KBまで）。分けて渡してみてね。");
+    return;
+  }
+  try{
+    const text = await file.text();
+    pendingImg = { kind: "text", text, name: file.name || "テキスト" };
+    $("attachThumb").hidden = true;
+    $("attachIcon").hidden = false;
+    $("attachName").textContent = pendingImg.name;
+    $("attachChip").hidden = false;
+    inputEl.focus();
+  }catch(e){
+    alert("このファイルは読み込めなかった…テキスト形式か確かめてみて。");
+  }
+});
 $("attachRemove").onclick = clearPendingImg;
 
 async function send(){
   let text = inputEl.value.trim();
   if(!text && !pendingImg) return;
   const img = pendingImg;
-  if(img && !text) text = "この画像を見てね。";
+  if(img && !text) text = (img.kind === "text") ? "このファイルを読んでね。" : "この画像を見てね。";
   clearPendingImg();
   inputEl.value = ""; autoGrow();
   await sendText(text, null, img);
 }
 
-async function sendText(text, apiOnlyExtra, image){
+async function sendText(text, apiOnlyExtra, image, opts){
+  opts = opts || {};
   if(!text || sending || !currentRoom) return;
   if(currentRoom.isHiroba){
     sending = true; sendBtn.disabled = true;
@@ -2888,16 +3101,23 @@ async function sendText(text, apiOnlyExtra, image){
 
   /* 画像は表示用にしまってから、履歴には目印だけ残す */
   let imgId = null;
-  if(image){
+  if(image && image.kind !== "text"){
     imgId = uid();
     try{ await imgPut({ id: imgId, roomId: currentRoom.id, dataUrl: image.dataUrl, name: image.name || "" }); }
     catch(e){ imgId = null; }
   }
-  const entry = { role:"user", content:text, ts:Date.now() };
-  if(imgId){ entry.imgId = imgId; entry.imgName = image.name || ""; }
-  chat.push(entry);
-  saveChat();
-  addBubble("user", text, null, imgId);
+  let entry = null;
+  if(!opts.regen){
+    entry = { role:"user", content:text, ts:Date.now() };
+    if(imgId){ entry.imgId = imgId; entry.imgName = image.name || ""; }
+    if(image && image.kind === "text"){ entry.txtName = image.name || "テキスト"; entry.txt = image.text || ""; }
+    chat.push(entry);
+    saveChat();
+    const el = addBubble("user", text, null, imgId, undefined, entry);
+    el.dataset.ci = chat.length - 1;
+    chatEl.appendChild(userMetaLine(entry, chat.length - 1));
+    scrollBottom();
+  }
 
   const typing = document.createElement("div");
   typing.className = "typing"; typing.textContent = "かんがえ中";
@@ -2914,6 +3134,9 @@ async function sendText(text, apiOnlyExtra, image){
       if(m.role === "user" && m.imgId && m !== entry){
         c += "\n（このとき画像" + (m.imgName ? "「" + m.imgName + "」" : "") + "を1枚見せてもらったの。画像はその場かぎりで、今はもう見えないよ）";
       }
+      if(m.role === "user" && m.txt){
+        c += "\n\n---\n📄 このとき渡されたテキストファイル「" + (m.txtName || "") + "」:\n" + m.txt;
+      }
       messages.push({ role:m.role, content:c });
     }
   }
@@ -2923,7 +3146,7 @@ async function sendText(text, apiOnlyExtra, image){
     if(last && last.role === "user") last.content = text + "\n\n---\n" + apiOnlyExtra;
   }
   /* 画像は今回のリクエストにだけ本物を添える */
-  if(image){
+  if(image && image.kind !== "text" && !opts.regen){
     const last = messages[messages.length - 1];
     if(last && last.role === "user"){
       last.content = [
@@ -2964,9 +3187,9 @@ async function sendText(text, apiOnlyExtra, image){
       mergeUsage(r.usage);
 
       if(r.text){
-        const entry = { role:"assistant", content:r.text, ts:Date.now() };
-        if(r.reasoning) entry.reasoning = r.reasoning;
-        chat.push(entry);
+        const aEntry = { role:"assistant", content:r.text, ts:Date.now(), model: currentRoom.model };
+        if(r.reasoning) aEntry.reasoning = r.reasoning;
+        chat.push(aEntry);
         saveChat();
       }
 
@@ -2997,7 +3220,13 @@ async function sendText(text, apiOnlyExtra, image){
       if(messages[0]?.role === "system") messages[0].content = newSys;
     }
     if(typing.parentNode) typing.remove();
-    if(totalUsage) addMeta(totalUsage);
+    if(totalUsage){
+      for(let i = chat.length - 1; i >= 0; i--){
+        if(chat[i].role === "assistant"){ chat[i].usage = totalUsage; break; }
+      }
+      saveChat();
+    }
+    renderChat();
     scrollBottom();
   }catch(err){
     if(typing.parentNode) typing.remove();
@@ -3923,6 +4152,7 @@ async function renderStorageMeter(){
 $("globalSettingsBtn").onclick = () => {
   $("apiKey").value = global.apiKey;
   $("localUrl").value = global.localUrl || "";
+  renderTextPrefs();
   renderBackupHint();
   renderWorldGrid();
   renderStorageMeter();
@@ -3941,6 +4171,34 @@ $("toggleKey").onclick = () => {
   f.type = show ? "text" : "password";
   $("toggleKey").textContent = show ? "隠す" : "表示";
 };
+/* ---------- v0.21 文字サイズと行間 ---------- */
+function applyTextPrefs(){
+  document.documentElement.style.setProperty("--msgfs", (global.msgFs || 15) + "px");
+  document.documentElement.style.setProperty("--msglh", String(global.msgLh || 1.75));
+}
+function renderTextPrefs(){
+  const fs = global.msgFs || 15, lh = global.msgLh || 1.75;
+  $("fsRange").value = fs; $("lhRange").value = lh;
+  $("fsVal").textContent = fs + "px";
+  $("lhVal").textContent = Number(lh).toFixed(2);
+}
+$("fsRange").oninput = () => {
+  global.msgFs = parseFloat($("fsRange").value);
+  save(LS_GLOBAL, global); applyTextPrefs(); renderTextPrefs();
+};
+$("lhRange").oninput = () => {
+  global.msgLh = parseFloat($("lhRange").value);
+  save(LS_GLOBAL, global); applyTextPrefs(); renderTextPrefs();
+};
+applyTextPrefs();
+/* ---------- v0.21 キーボードで入力欄が隠れないように ---------- */
+if(window.visualViewport){
+  let vvT = null;
+  window.visualViewport.addEventListener("resize", () => {
+    document.body.style.height = window.visualViewport.height + "px";
+    clearTimeout(vvT); vvT = setTimeout(scrollBottom, 80);
+  });
+}
 $("wipeBtn").onclick = async () => {
   if(confirm("全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーを、この端末から全部消すよ。本当にいい?")){
     for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); }
@@ -4300,7 +4558,9 @@ function startNewThread(){
   chat = [];
   $("threadName").textContent = t.title;
   renderChat();
+  renderSpeakerBar();
   closePanels();
+  if(currentRoom.isHiroba) openHirobaPicker();
 }
 
 function switchThread(threadId){
