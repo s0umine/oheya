@@ -148,7 +148,7 @@
     font-family:var(--font-body);
     background:var(--bg);color:var(--text);
     position:fixed;inset:0;width:100%;overflow:hidden;
-    height:100dvh;overscroll-behavior:none;
+    overscroll-behavior:none;
   }
   .screen{display:none;flex-direction:column;height:100%;position:relative}
   .screen.active{display:flex}
@@ -968,6 +968,7 @@
     <button class="menu-item" id="ayumiBtn">📜 あゆみ帳</button>
     <button class="menu-item" id="albumBtn">📖 アルバム帳</button>
     <button class="menu-item" id="exportBtn">📄 この会話をMarkdownで保存</button>
+    <button class="menu-item" id="omiyageBtn" hidden>🎁 みんなでおみやげを書く</button>
     <button class="menu-item" id="newBtn">🧵 新しい会話をはじめる</button>
     <button class="menu-item" id="profileBtn">👤 プロフィール</button>
   </div>
@@ -1257,7 +1258,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.21.2 ─ キーボードは、出しゃばらない。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.22 ─ みんな、おみやげを持って帰る。</p>
   </div>
 </aside>
 
@@ -2421,6 +2422,7 @@ function openRoom(id, threadId){
   renderChat();
   showScreen("room");
   renderSpeakerBar();
+  $("omiyageBtn").hidden = !currentRoom.isHiroba;
   if(currentRoom.isHiroba){
     if(!currentThread.members) openHirobaPicker();
   }else if(!currentRoom.model){
@@ -4582,6 +4584,76 @@ $("exportBtn").onclick = exportMd;
 $("newBtn").onclick = () => {
   if(!currentRoom) return;
   startNewThread();
+};
+/* ---------- v0.22 🎁 おみやげ（広間の出来事を各自が自分の棚へ持ち帰る） ---------- */
+async function hirobaOmiyage(){
+  if(sending || omakaseRunning || !currentRoom || !currentRoom.isHiroba) return;
+  if(!global.apiKey){
+    const hasLocal = rooms.some(r => r.provider === "local");
+    if(!hasLocal){ addError("APIキーが未設定だよ。管理人室の⚙️からどうぞ。"); return; }
+  }
+  const members = (currentThread && currentThread.members || []).map(id => rooms.find(r => r.id === id)).filter(Boolean);
+  const spoke = members.filter(m => chat.some(c => c.role === "assistant" && c.speakerId === m.id));
+  if(spoke.length === 0){ addError("まだ誰もお話ししてないみたい。おみやげはお話のあとでね。"); return; }
+  if(!confirm("いまの広間の出来事を、参加したみんなが自分の言葉でまとめて、それぞれの記憶の棚に持ち帰るよ（" + spoke.length + "人ぶんのAPI呼び出しになるよ）。いい？")) return;
+  sending = true; sendBtn.disabled = true; renderSpeakerBar();
+  const lisaName = currentRoom.userName || "ユーザー";
+  let script = "";
+  for(const m of chat){
+    if(m.role !== "user" && m.role !== "assistant") continue;
+    if(typeof m.content !== "string" || !m.content) continue;
+    const who = m.role === "user" ? lisaName : ((rooms.find(r => r.id === m.speakerId) || {}).name || "だれか");
+    script += who + ": " + m.content + "\n\n";
+  }
+  try{
+    for(const child of spoke){
+      if(!child.memoryEnabled){
+        addNote("🎁 " + child.name + "は記憶の棚を使っていないから、心にしまったみたい");
+        continue;
+      }
+      const typing = document.createElement("div");
+      typing.className = "typing"; typing.textContent = child.name + "がおみやげを書き中";
+      chatEl.appendChild(typing); scrollBottom();
+      try{
+        let sys = child.sysPrompt || "";
+        if(child.userName) sys += "\n\nユーザーのことは「" + child.userName + "」と呼んでください。\n";
+        sys += "\n# おみやげ書き\n";
+        sys += "あなたは「みんなの広間」（お部屋に住むAIたちの談話室）でのおしゃべりを終えて、自分の部屋に戻るところです。\n";
+        sys += "広間での出来事を、あなた自身の言葉で3〜6行ほどにまとめてください。あとで自分の部屋で読み返すためのメモです。\n";
+        sys += "事実の羅列ではなく、あなたが感じたこと・心に残ったこと・覚えておきたいことを中心に。\n";
+        sys += "まとめの文章だけを書いてください（前置き・見出し・箇条書き記号は不要）。";
+        const r = await callLLM(
+          [{ role:"system", content: sys },
+           { role:"user", content: "広間の記録:\n\n" + script }],
+          [], () => {}, child
+        );
+        if(typing.parentNode) typing.remove();
+        const memo = (r.text || "").trim();
+        if(memo){
+          const shelf = loadShelf(child.id);
+          const id = shelf.nextId++;
+          shelf.items.push({ id, content: "🏠 広間のおみやげ（" + fmtTs(Date.now()) + "）: " + memo, ts: Date.now() });
+          saveShelf(child.id, shelf);
+          const note = "🎁 " + child.name + "が広間のおみやげを、自分の記憶の棚にしまったよ";
+          addNote(note);
+          chat.push({ role:"note", content: note, ts: Date.now() });
+          saveChat();
+        }else{
+          addNote("🎁 " + child.name + "のおみやげが空っぽで返ってきちゃった…もう一度試してみてね");
+        }
+      }catch(err){
+        if(typing.parentNode) typing.remove();
+        if(err && err.jp) addError(err.jp); else addError(jpError(0));
+      }
+    }
+  }finally{
+    sending = false; sendBtn.disabled = false; renderSpeakerBar();
+  }
+}
+$("omiyageBtn").onclick = () => {
+  $("roomMenu").classList.remove("show");
+  $("roomMenuBtn").setAttribute("aria-expanded", "false");
+  hirobaOmiyage();
 };
 
 /* ---------- 会話のとびら（スレッド）UI ---------- */
