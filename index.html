@@ -1257,7 +1257,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.21.1 ─ 指を離しても、采配は続く。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.21.2 ─ キーボードは、出しゃばらない。</p>
   </div>
 </aside>
 
@@ -3021,6 +3021,9 @@ async function callLLM(messages, tools){
 
 /* ---------- 送信 ---------- */
 /* ---------- 画像を見せる ---------- */
+/* スマホ（タッチ端末）では送信後の自動フォーカスをしない（キーボードが再び出ちゃうから） */
+const touchDevice = matchMedia("(pointer:coarse)").matches;
+function refocusInput(){ if(!touchDevice) inputEl.focus(); }
 let pendingImg = null; // { kind:"image"|"text", dataUrl?, text?, name }
 function clearPendingImg(){
   pendingImg = null;
@@ -3114,7 +3117,7 @@ async function sendText(text, apiOnlyExtra, image, opts){
   if(currentRoom.isHiroba){
     sending = true; sendBtn.disabled = true;
     try{ await hirobaUserSend(text, image); }
-    finally{ sending = false; sendBtn.disabled = false; renderSpeakerBar(); inputEl.focus(); }
+    finally{ sending = false; sendBtn.disabled = false; renderSpeakerBar(); refocusInput(); }
     return;
   }
   if(!global.apiKey && currentRoom.provider !== "local"){ addError("APIキーが未設定だよ。管理人室の⚙️からどうぞ。"); return; }
@@ -3258,7 +3261,7 @@ async function sendText(text, apiOnlyExtra, image, opts){
     else addError(jpError(0));
   }finally{
     sending = false; sendBtn.disabled = false;
-    inputEl.focus();
+    refocusInput();
   }
 }
 
@@ -4220,7 +4223,9 @@ if(window.visualViewport){
   const vv = window.visualViewport;
   let vvT = null;
   const fitViewport = () => {
-    document.body.style.height = vv.height + "px";
+    /* キーボードが出ている時だけ縮める。閉じたら元の高さ（100dvh）に戻すよ */
+    const kbOpen = (window.innerHeight - vv.height) > 60;
+    document.body.style.height = kbOpen ? (vv.height + "px") : "";
     /* iOSがフォーカス欄を見せようと勝手にページをずらすので、毎回打ち消す */
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
