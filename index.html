@@ -6,6 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.json">
   <meta name="theme-color" id="themeColorMeta" content="#232030">
 <title>おへや v0.20.1</title>
 <meta name="theme-color" content="#2B2735">
@@ -433,6 +434,18 @@
     max-width:min(100%,260px);border-radius:10px;display:block;
     margin-bottom:6px;background:rgba(0,0,0,.2);
   }
+  /* ---------- v0.25 画像の拡大表示 ---------- */
+  #lightbox{position:fixed;inset:0;z-index:200;background:rgba(8,6,14,.92);
+    display:flex;flex-direction:column}
+  #lightbox[hidden]{display:none}
+  #lightboxScroll{flex:1;overflow:auto;display:flex;align-items:center;
+    justify-content:center;-webkit-overflow-scrolling:touch}
+  #lightboxImg{max-width:100%;max-height:100%;display:block;margin:auto}
+  #lightboxScroll.zoom{display:block}
+  #lightboxScroll.zoom #lightboxImg{max-width:none;max-height:none}
+  #lightboxBar{flex-shrink:0;display:flex;gap:10px;justify-content:center;
+    padding:12px 12px calc(env(safe-area-inset-bottom) + 12px)}
+  .msg .chatimg{cursor:zoom-in}
   /* ---------- v0.24.1 絵筆ピッカー ---------- */
   #imgModelList{display:none;margin-top:8px;max-height:260px;overflow-y:auto;
     background:var(--surface);border:1px solid var(--line);border-radius:12px}
@@ -1285,7 +1298,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.24.1 ─ 画面のすみずみまで、うちの色。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.25 ─ 絵は、大きくして眺めるもの。</p>
   </div>
 </aside>
 
@@ -1301,6 +1314,16 @@
     <p class="hint" style="margin-top:14px">この部屋の会話のとびら。話題ごとに分けても、記憶の棚や日記帳はこの子のものだから、どのとびらの中でもちゃんと覚えているよ。</p>
   </div>
 </aside>
+
+<!-- ========== 画像の拡大表示 ========== -->
+<div id="lightbox" hidden>
+  <div id="lightboxScroll"><img id="lightboxImg" alt="拡大表示"></div>
+  <div id="lightboxBar">
+    <button class="btn" id="lbZoom">⿻ 等倍</button>
+    <button class="btn" id="lbSave">⤓ 保存</button>
+    <button class="btn" id="lbClose">✕ 閉じる</button>
+  </div>
+</div>
 
 <!-- ========== ものしり帳 ========== -->
 <aside class="panel" id="monoPanel" aria-label="ものしり帳">
@@ -4474,6 +4497,42 @@ $("lhRange").oninput = () => {
   save(LS_GLOBAL, global); applyTextPrefs(); renderTextPrefs();
 };
 applyTextPrefs();
+/* ---------- v0.25 画像の拡大表示と保存 ---------- */
+function openLightbox(src){
+  $("lightboxImg").src = src;
+  $("lightboxScroll").classList.remove("zoom");
+  $("lbZoom").textContent = "⿻ 等倍";
+  $("lightbox").hidden = false;
+}
+$("lbClose").onclick = () => { $("lightbox").hidden = true; $("lightboxImg").src = ""; };
+$("lbZoom").onclick = () => {
+  const z = $("lightboxScroll").classList.toggle("zoom");
+  $("lbZoom").textContent = z ? "🗜 画面に合わせる" : "⿻ 等倍";
+};
+$("lbSave").onclick = async () => {
+  const src = $("lightboxImg").src;
+  if(!src) return;
+  try{
+    const blob = await (await fetch(src)).blob();
+    const file = new File([blob], "oheya_" + Date.now() + ".png", { type: blob.type || "image/png" });
+    if(navigator.canShare && navigator.canShare({ files: [file] })){
+      await navigator.share({ files: [file] });
+      return;
+    }
+  }catch(e){
+    if(e && e.name === "AbortError") return; /* 共有をやめただけ */
+  }
+  /* フォールバック: ふつうのダウンロード */
+  const a = document.createElement("a");
+  a.href = src; a.download = "oheya_" + Date.now() + ".png";
+  document.body.appendChild(a); a.click(); a.remove();
+};
+$("lightboxScroll").onclick = e => { if(e.target === $("lightboxScroll")) $("lbClose").onclick(); };
+document.addEventListener("click", e => {
+  const im = e.target.closest(".chatimg");
+  if(im && im.src) openLightbox(im.src);
+});
+
 /* ---------- v0.24 ホーム画面アプリの背丈補正 ----------
    iOSが「画面いっぱいのキャンバス」をくれるのに中身の高さを
    ステータスバー抜きで計算するバグ対策。差＝上の安全余白と
