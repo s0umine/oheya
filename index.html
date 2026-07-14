@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
 <title>おへや v0.20.1</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1248,6 +1250,11 @@
       <div class="credits" id="storageMeter">計測中…</div>
       <p class="hint">たんす（localStorage）は約5MBの小物入れ。いっぱいに近づいたら教えてね、お引越しを考えよう。</p>
     </div>
+    <div class="field" style="margin-top:28px">
+      <label>🩺 画面の診断</label>
+      <div class="credits" id="viewportDiag" style="white-space:pre-line">計測中…</div>
+      <p class="hint">入力欄の下に空白ができる時など、画面の様子を調べるためのものだよ。この数字をフェイブルに見せてね。</p>
+    </div>
     <div class="field" style="margin-top:16px">
       <label>思い出のお守り（バックアップ）</label>
       <div class="row">
@@ -1267,7 +1274,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.23 ─ 必要なときだけ、ページをめくる。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.23.1 ─ お医者さんごっこ、はじめるよ。</p>
   </div>
 </aside>
 
@@ -4300,6 +4307,7 @@ $("globalSettingsBtn").onclick = () => {
   $("apiKey").value = global.apiKey;
   $("localUrl").value = global.localUrl || "";
   renderTextPrefs();
+  renderViewportDiag();
   renderBackupHint();
   renderWorldGrid();
   renderStorageMeter();
@@ -4338,6 +4346,30 @@ $("lhRange").oninput = () => {
   save(LS_GLOBAL, global); applyTextPrefs(); renderTextPrefs();
 };
 applyTextPrefs();
+/* ---------- v0.23.1 画面の診断 ---------- */
+function renderViewportDiag(){
+  const el = $("viewportDiag");
+  if(!el) return;
+  try{
+    /* safe-area の実測: 一時要素にenv()を当てて測る */
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:fixed;left:-9999px;padding-bottom:env(safe-area-inset-bottom);padding-top:env(safe-area-inset-top)";
+    document.body.appendChild(probe);
+    const cs = getComputedStyle(probe);
+    const saB = cs.paddingBottom, saT = cs.paddingTop;
+    probe.remove();
+    const vv = window.visualViewport;
+    const lines = [
+      "画面(screen): " + screen.width + " × " + screen.height,
+      "窓(inner): " + window.innerWidth + " × " + window.innerHeight,
+      "見えてる範囲(vv): " + (vv ? Math.round(vv.width) + " × " + Math.round(vv.height) + "（倍率 " + vv.scale.toFixed(2) + "、ずれ " + Math.round(vv.offsetTop) + "）" : "取得できず"),
+      "本体(body): " + Math.round(document.body.getBoundingClientRect().height),
+      "安全余白: 上 " + saT + " / 下 " + saB,
+      "起動モード: " + (navigator.standalone === true ? "ホーム画面アプリ" : (navigator.standalone === false ? "ブラウザ" : "不明")),
+    ];
+    el.textContent = lines.join("\n");
+  }catch(e){ el.textContent = "計測に失敗しちゃった: " + e.message; }
+}
 /* ---------- v0.23 起動時に画面のずれをリセット（PWAは前回の表示状態を復元してくるの） ---------- */
 (function resetViewportDrift(){
   let n = 0;
