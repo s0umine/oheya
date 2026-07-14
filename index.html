@@ -1258,7 +1258,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.22 ─ みんな、おみやげを持って帰る。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.22.1 ─ 空白地帯に、さよならを。</p>
   </div>
 </aside>
 
@@ -4225,14 +4225,19 @@ if(window.visualViewport){
   const vv = window.visualViewport;
   let vvT = null;
   const fitViewport = () => {
-    /* キーボードが出ている時だけ縮める。閉じたら元の高さ（100dvh）に戻すよ */
-    const kbOpen = (window.innerHeight - vv.height) > 60;
+    /* 入力欄にフォーカスしている時だけキーボード判定する（それ以外で縮めると
+       ページの拡大率が残っている時に誤判定して、下に謎の空白ができるの） */
+    const ae = document.activeElement;
+    const editing = ae && (ae.tagName === "TEXTAREA" || ae.tagName === "INPUT");
+    /* vv.heightは拡大率ぶん小さく見えるので、scaleを掛けて実寸に戻して比べる */
+    const kbOpen = editing && (window.innerHeight - vv.height * vv.scale) > 60;
     document.body.style.height = kbOpen ? (vv.height + "px") : "";
     /* iOSがフォーカス欄を見せようと勝手にページをずらすので、毎回打ち消す */
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     clearTimeout(vvT); vvT = setTimeout(scrollBottom, 80);
   };
+  inputEl.addEventListener("blur", () => { setTimeout(fitViewport, 100); });
   vv.addEventListener("resize", fitViewport);
   vv.addEventListener("scroll", fitViewport);
   inputEl.addEventListener("focus", () => { setTimeout(fitViewport, 250); });
