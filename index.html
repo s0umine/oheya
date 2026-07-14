@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" id="themeColorMeta" content="#232030">
-<title>おへや v0.20.1</title>
+<title>おへや</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -450,6 +450,22 @@
     display:flex;justify-content:space-between;align-items:center;gap:8px;
   }
   .letter-card .lc-head .mbtn{font-size:12px}
+  .lb-section{font-size:13px;color:var(--muted);padding:4px 2px;margin:4px 0 10px}
+  .letter-bundle{margin-bottom:6px}
+  .letter-bundle > summary{
+    cursor:pointer;font-size:14px;color:var(--text);
+    padding:10px 6px;border-bottom:1px dashed var(--line);margin-bottom:10px;
+  }
+  .letter-env{margin:0 0 10px}
+  .letter-env > summary{
+    cursor:pointer;font-size:13px;color:var(--muted);
+    background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .letter-env[open] > summary{
+    border-radius:10px 10px 0 0;border-bottom:none;color:var(--text);
+  }
+  .letter-env[open] > .letter-card{border-radius:0 0 4px 14px;margin-bottom:0}
   /* ---------- v0.25 画像の拡大表示 ---------- */
   #lightbox{position:fixed;inset:0;z-index:200;background:rgba(8,6,14,.92);
     display:flex;flex-direction:column}
@@ -1320,7 +1336,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.27 ─ 手紙は、箱にしまって何度でも。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.28 ─ 月の束をほどいて、封を切る。</p>
   </div>
 </aside>
 
@@ -3631,6 +3647,47 @@ function collectOldLetters(){
     saveLetters(currentRoom.id, box);
   }
 }
+function letterCard(it){
+  const card = document.createElement("div");
+  card.className = "letter-card";
+  const head = document.createElement("div");
+  head.className = "lc-head";
+  const info = document.createElement("span");
+  info.textContent = fmtTs(it.ts) + (it.model ? " ・ " + String(it.model).split("/").pop() : "");
+  const btns = document.createElement("span");
+  const star = miniBtn(it.star ? "⭐" : "☆", it.star ? "しおりを外す" : "しおりを挟む", () => {
+    const b = loadLetters(currentRoom.id);
+    const x = b.items.find(y => y.id === it.id);
+    if(x) x.star = !x.star;
+    saveLetters(currentRoom.id, b);
+    renderLetterBox();
+  });
+  const cp = miniBtn("⧉", "この手紙をコピー", e => copyToClip(it.content, e.currentTarget));
+  const del = miniBtn("🗑", "この手紙を手放す", () => {
+    if(!confirm("このお手紙を手放すよ。レターボックスから消えるけど、いい？")) return;
+    const b = loadLetters(currentRoom.id);
+    b.items = b.items.filter(x => x.id !== it.id);
+    saveLetters(currentRoom.id, b);
+    renderLetterBox();
+  });
+  btns.appendChild(star); btns.appendChild(cp); btns.appendChild(del);
+  head.appendChild(info); head.appendChild(btns);
+  const body = document.createElement("div");
+  body.textContent = it.content;
+  card.appendChild(head); card.appendChild(body);
+  return card;
+}
+function letterEnvelope(it, open){
+  const env = document.createElement("details");
+  env.className = "letter-env";
+  if(open) env.open = true;
+  const sum = document.createElement("summary");
+  const preview = String(it.content || "").replace(/\s+/g, " ").slice(0, 14);
+  sum.textContent = "💌 " + fmtTs(it.ts) + "　" + preview + "…";
+  env.appendChild(sum);
+  env.appendChild(letterCard(it));
+  return env;
+}
 function renderLetterBox(){
   const boxEl = $("letterList");
   boxEl.innerHTML = "";
@@ -3641,28 +3698,43 @@ function renderLetterBox(){
     boxEl.innerHTML = '<p class="hint">まだお手紙は届いていないよ。プロフィールの「💌 お手紙」がオンなら、しばらくぶりに訪ねた時に届くかも。</p>';
     return;
   }
-  for(const it of [...box.items].reverse()){
-    const card = document.createElement("div");
-    card.className = "letter-card";
-    const head = document.createElement("div");
-    head.className = "lc-head";
-    const info = document.createElement("span");
-    info.textContent = fmtTs(it.ts) + (it.model ? " ・ " + String(it.model).split("/").pop() : "");
-    const btns = document.createElement("span");
-    const cp = miniBtn("⧉", "この手紙をコピー", e => copyToClip(it.content, e.currentTarget));
-    const del = miniBtn("🗑", "この手紙を手放す", () => {
-      if(!confirm("このお手紙を手放すよ。box からは消えるけど、いい？".replace("box ", "レターボックス"))) return;
-      const b = loadLetters(currentRoom.id);
-      b.items = b.items.filter(x => x.id !== it.id);
-      saveLetters(currentRoom.id, b);
-      renderLetterBox();
-    });
-    btns.appendChild(cp); btns.appendChild(del);
-    head.appendChild(info); head.appendChild(btns);
-    const body = document.createElement("div");
-    body.textContent = it.content;
-    card.appendChild(head); card.appendChild(body);
-    boxEl.appendChild(card);
+  const items = [...box.items].reverse(); /* 新しい順 */
+  /* ⭐ しおり付きは箱の一番上に、開いた状態で */
+  const starred = items.filter(x => x.star);
+  if(starred.length){
+    const h = document.createElement("div");
+    h.className = "lb-section";
+    h.textContent = "⭐ しおり付き（" + starred.length + "通）";
+    boxEl.appendChild(h);
+    for(const it of starred) boxEl.appendChild(letterCard(it));
+    const h2 = document.createElement("div");
+    h2.className = "lb-section";
+    h2.textContent = "📮 月の束";
+    boxEl.appendChild(h2);
+  }
+  /* 📮 月の束（最新の月だけ開いておく）。しおり付きも束の中に居場所は残すよ */
+  const groups = new Map();
+  for(const it of items){
+    const d = new Date(it.ts || 0);
+    const key = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+    if(!groups.has(key)) groups.set(key, { label: d.getFullYear() + "年" + (d.getMonth() + 1) + "月", arr: [] });
+    groups.get(key).arr.push(it);
+  }
+  let firstBundle = true;
+  for(const [key, g] of groups){
+    const det = document.createElement("details");
+    det.className = "letter-bundle";
+    if(firstBundle) det.open = true;
+    const sum = document.createElement("summary");
+    sum.textContent = "📮 " + g.label + "（" + g.arr.length + "通）";
+    det.appendChild(sum);
+    let firstLetter = firstBundle;
+    for(const it of g.arr){
+      det.appendChild(letterEnvelope(it, firstLetter)); /* いちばん新しい手紙だけ開封済み */
+      firstLetter = false;
+    }
+    boxEl.appendChild(det);
+    firstBundle = false;
   }
 }
 $("letterBoxBtn").onclick = () => { renderLetterBox(); openPanel($("letterPanel")); };
