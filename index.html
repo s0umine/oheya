@@ -1352,7 +1352,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.29.2 ─ ゴミ箱も、線のなかまに。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.29.3 ─ 記録は、その場でしまう。</p>
   </div>
 </aside>
 
@@ -3522,6 +3522,7 @@ async function sendText(text, apiOnlyExtra, image, opts){
       if(r.text){
         const aEntry = { role:"assistant", content:r.text, ts:Date.now(), model: currentRoom.model };
         if(r.reasoning) aEntry.reasoning = r.reasoning;
+        if(r.usage) aEntry.usage = r.usage; /* 本文と同じ便で保存（あとで合計に置き換わるよ） */
         chat.push(aEntry);
         saveChat();
       }
@@ -4828,6 +4829,19 @@ function renderViewportDiag(){
 }
 /* v0.26: 起動時の位置リセットは撤去（手で戻した位置を尊重するよ）。診断用の計測だけ残す */
 fixStandaloneGap();
+/* ---------- v0.29.3 駆け込み保存 ----------
+   iOSはアプリを閉じた瞬間、書き込み中の処理を殺すことがあるの。
+   画面が隠れる時に今の会話をもう一度保存して、くらへの書き込みを見届けるよ */
+document.addEventListener("visibilitychange", () => {
+  if(document.visibilityState === "hidden"){
+    try{ if(currentRoom && currentThread) saveChat(); }catch(e){}
+    flushWrites();
+  }
+});
+window.addEventListener("pagehide", () => {
+  try{ if(currentRoom && currentThread) saveChat(); }catch(e){}
+  flushWrites();
+});
 /* ---------- v0.26 固定はやめたよ。キーボードで動いた分は指で戻せる（昔の操作感） ----------
    キーボードを閉じた時にチャットの一番下へ寄せるおまけだけ残すね */
 if(window.visualViewport){
@@ -4844,11 +4858,14 @@ function fmtTok(n){
 $("kozukaiBtn").onclick = () => {
   const box = $("kozukaiResult");
   const agg = new Map(); /* "YYYY-MM" -> { label, rooms: Map(name -> {cost, tok}) } */
+  let scanned = 0, withUsage = 0;
   for(const r of rooms){
     for(const t of (r.threads || [])){
       const c = load(threadKey(r.id, t.id)) || [];
       for(const m of c){
+        if(m.role === "assistant") scanned++;
         if(!m.usage) continue;
+        withUsage++;
         const d = new Date(m.ts || 0);
         const key = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
         if(!agg.has(key)) agg.set(key, { label: d.getFullYear() + "年" + (d.getMonth() + 1) + "月", rooms: new Map() });
@@ -4861,7 +4878,7 @@ $("kozukaiBtn").onclick = () => {
     }
   }
   if(agg.size === 0){
-    box.textContent = "まだ記録がないよ。これからの会話が記帳されていくの。";
+    box.textContent = "まだ記録がないよ。これからの会話が記帳されていくの。\n（調べたお返事: " + scanned + "件 ・ トークン記録つき: " + withUsage + "件）";
     box.style.display = "block";
     return;
   }
@@ -4878,6 +4895,7 @@ $("kozukaiBtn").onclick = () => {
     }
     lines.push("");
   }
+  lines.push("（調べたお返事 " + scanned + "件 ・ 記録つき " + withUsage + "件。記録はv0.21以降の会話に付くよ）");
   box.textContent = lines.join("\n").trim();
   box.style.display = "block";
 };
