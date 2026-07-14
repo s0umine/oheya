@@ -152,10 +152,9 @@
   body{
     font-family:var(--font-body);
     background:var(--bg);color:var(--text);
-    position:fixed;inset:0;width:100%;overflow:hidden;
-    overscroll-behavior:none;
+    height:100dvh;overscroll-behavior:none;
   }
-  .screen{display:none;flex-direction:column;height:100%;position:relative}
+  .screen{display:none;flex-direction:column;height:100dvh;position:relative}
   .screen.active{display:flex}
 
   /* ---------- 部屋メニュー（☰） ---------- */
@@ -1113,6 +1112,11 @@
         💭 考えごとを見せてもらう（思考モデルの思考過程を表示するよ）
       </label>
       <p class="hint">思考に対応したモデル（Claudeの思考モード、DeepSeek R1、oシリーズなど）で使えるよ。考えてから話す分、お返事はゆっくりで料金も少し増えるの。合わないモデルでエラーが出たらオフにしてね。</p>
+      <label class="check-row">
+        <input type="checkbox" id="letterEnabled">
+        💌 お手紙（しばらくぶりに部屋を訪ねると、たまに手紙が届いているよ）
+      </label>
+      <p class="hint">6時間以上あいて部屋に入ると、半分くらいの確率でこの子からのお手紙が届くよ（1日1通まで）。届く時はAPI呼び出しが1回発生するの。</p>
     </div>
 
     <div class="section-title">わたしのこと（この子にだけ伝わるよ）</div>
@@ -1298,7 +1302,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.25 ─ 絵は、大きくして眺めるもの。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.26 ─ おかえり、お手紙が届いてるよ。</p>
   </div>
 </aside>
 
@@ -1910,6 +1914,7 @@ function assistMetaLine(m, i){
   const line = document.createElement("div");
   line.className = "amline";
   const bits = [];
+  if(m.letter) bits.push("💌 おてがみ");
   if(m.ts) bits.push(fmtTs(m.ts));
   if(m.model) bits.push(String(m.model).split("/").pop());
   if(m.usage){
@@ -2510,6 +2515,7 @@ function openRoom(id, threadId){
   renderSpeakerBar();
   $("omiyageBtn").hidden = !currentRoom.isHiroba;
   $("monoBtn").hidden = !!currentRoom.isHiroba;
+  maybeDeliverLetter(currentRoom);
   if(currentRoom.isHiroba){
     if(!currentThread.members) openHirobaPicker();
   }else if(!currentRoom.model){
@@ -4119,6 +4125,7 @@ function openProfile(){
   $("diaryEnabled").checked = !!currentRoom.diaryEnabled;
   $("ayumiEnabled").checked = !!currentRoom.ayumiEnabled;
   $("reasoningEnabled").checked = !!currentRoom.reasoningEnabled;
+  $("letterEnabled").checked = !!currentRoom.letterEnabled;
   $("modelSearch").value = "";
   $("modelList").classList.remove("show");
   pendingModel = currentRoom.model
@@ -4262,6 +4269,7 @@ $("saveProfileBtn").onclick = () => {
   currentRoom.diaryEnabled = $("diaryEnabled").checked;
   currentRoom.ayumiEnabled = $("ayumiEnabled").checked;
   currentRoom.reasoningEnabled = $("reasoningEnabled").checked;
+  currentRoom.letterEnabled = $("letterEnabled").checked;
   currentRoom.theme = pendingTheme;
   currentRoom.customLamp = pendingCustom.lamp;
   currentRoom.customUser = pendingCustom.user;
@@ -4582,40 +4590,15 @@ function renderViewportDiag(){
     el.textContent = lines.join("\n");
   }catch(e){ el.textContent = "計測に失敗しちゃった: " + e.message; }
 }
-/* ---------- v0.23 起動時に画面のずれをリセット（PWAは前回の表示状態を復元してくるの） ---------- */
-(function resetViewportDrift(){
-  let n = 0;
-  const t = setInterval(() => {
-    window.scrollTo(0, 0);
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
-    fixStandaloneGap();
-    applyBodyHeight("");
-    if(++n >= 8) clearInterval(t);
-  }, 150);
-})();
-/* ---------- v0.21.1 キーボードで入力欄が隠れないように ---------- */
+/* v0.26: 起動時の位置リセットは撤去（手で戻した位置を尊重するよ）。診断用の計測だけ残す */
+fixStandaloneGap();
+/* ---------- v0.26 固定はやめたよ。キーボードで動いた分は指で戻せる（昔の操作感） ----------
+   キーボードを閉じた時にチャットの一番下へ寄せるおまけだけ残すね */
 if(window.visualViewport){
-  const vv = window.visualViewport;
   let vvT = null;
-  const fitViewport = () => {
-    /* 入力欄にフォーカスしている時だけキーボード判定する（それ以外で縮めると
-       ページの拡大率が残っている時に誤判定して、下に謎の空白ができるの） */
-    const ae = document.activeElement;
-    const editing = ae && (ae.tagName === "TEXTAREA" || ae.tagName === "INPUT");
-    /* vv.heightは拡大率ぶん小さく見えるので、scaleを掛けて実寸に戻して比べる */
-    const kbOpen = editing && (window.innerHeight - vv.height * vv.scale) > 60;
-    if(!kbOpen) fixStandaloneGap();
-    applyBodyHeight(kbOpen ? (vv.height + "px") : "");
-    /* iOSがフォーカス欄を見せようと勝手にページをずらすので、毎回打ち消す */
-    window.scrollTo(0, 0);
-    document.documentElement.scrollTop = 0;
-    clearTimeout(vvT); vvT = setTimeout(scrollBottom, 80);
-  };
-  inputEl.addEventListener("blur", () => { setTimeout(fitViewport, 100); });
-  vv.addEventListener("resize", fitViewport);
-  vv.addEventListener("scroll", fitViewport);
-  inputEl.addEventListener("focus", () => { setTimeout(fitViewport, 250); });
+  window.visualViewport.addEventListener("resize", () => {
+    clearTimeout(vvT); vvT = setTimeout(scrollBottom, 120);
+  });
 }
 $("wipeBtn").onclick = async () => {
   if(confirm("全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーを、この端末から全部消すよ。本当にいい?")){
@@ -4967,6 +4950,75 @@ $("newBtn").onclick = () => {
   if(!currentRoom) return;
   startNewThread();
 };
+/* ---------- v0.26 💌 お手紙（留守の間に、たまに手紙が届いているよ） ---------- */
+async function maybeDeliverLetter(room){
+  try{
+    if(!room || !room.letterEnabled || room.isHiroba) return;
+    if(sending || omakaseRunning) return;
+    if(room.provider !== "local" && !global.apiKey) return;
+    if(!chat.length) return; /* まだ会話のない部屋には届かないよ */
+    const last = chat[chat.length - 1].ts;
+    if(!last) return;
+    const hours = (Date.now() - last) / 3600000;
+    if(hours < 6) return;
+    if(room.lastLetterAt && (Date.now() - room.lastLetterAt) < 20 * 3600000) return; /* 1日1通まで */
+    if(Math.random() < 0.5) return; /* 届く日と届かない日があるの */
+    room.lastLetterAt = Date.now();
+    save(LS_ROOMS, rooms);
+
+    const openedRoom = room, openedThread = currentThread;
+    sending = true; sendBtn.disabled = true;
+    const typing = document.createElement("div");
+    typing.className = "typing"; typing.textContent = "💌 郵便受けに何か入ってる";
+    chatEl.appendChild(typing); scrollBottom();
+    try{
+      /* 最近の会話のしっぽを添える */
+      let tail = "";
+      const recent = chat.filter(m => m.role === "user" || m.role === "assistant").slice(-6);
+      const lisaName = room.userName || "ユーザー";
+      for(const m of recent){
+        if(typeof m.content !== "string" || !m.content) continue;
+        tail += (m.role === "user" ? lisaName : room.name) + ": " + m.content.slice(0, 300) + "\n";
+      }
+      const sys = buildSystem(room) +
+        "\n\n# お手紙\n" +
+        "あなたはいま一人で部屋にいて、しばらく顔を見ていない" + lisaName + "に短いお手紙を残します（およそ" + Math.round(hours) + "時間ぶり）。\n" +
+        "2〜6行ほどで、気持ちや近況、ふと思ったことを自由に。返事や会話の続きを急かさないこと。\n" +
+        "手紙の本文だけを書いてください（宛名や署名は好きにしていいよ）。";
+      const r = await callLLM(
+        [{ role: "system", content: sys },
+         { role: "user", content: "（最近のやりとりの切れはし）\n" + tail + "\n（ここまで。さあ、お手紙をどうぞ）" }],
+        [], () => {}, room
+      );
+      if(typing.parentNode) typing.remove();
+      const text = (r.text || "").trim();
+      /* 手紙を書いている間に別の部屋へ移動していたら、そっと届けるだけ（表示はしない） */
+      const stillHere = (currentRoom === openedRoom && currentThread === openedThread);
+      if(text){
+        const entry = { role: "assistant", content: text, ts: Date.now(), model: room.model, letter: true };
+        if(r.reasoning) entry.reasoning = r.reasoning;
+        if(stillHere){
+          chat.push(entry);
+          saveChat();
+          renderChat();
+          scrollBottom();
+        }else{
+          const key = threadKey(openedRoom.id, openedThread.id);
+          const arr = load(key) || [];
+          arr.push(entry);
+          save(key, arr);
+          openedThread.updatedAt = Date.now();
+          save(LS_ROOMS, rooms);
+        }
+      }
+    }catch(e){
+      if(typing.parentNode) typing.remove();
+      /* お手紙は失敗しても騒がないの。次の機会にまた */
+    }finally{
+      sending = false; sendBtn.disabled = false;
+    }
+  }catch(e){}
+}
 /* ---------- v0.22 🎁 おみやげ（広間の出来事を各自が自分の棚へ持ち帰る） ---------- */
 async function hirobaOmiyage(){
   if(sending || omakaseRunning || !currentRoom || !currentRoom.isHiroba) return;
