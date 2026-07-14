@@ -1218,6 +1218,9 @@
       <label for="localUrl">🏠 ローカルLLMの接続先（LM Studioなど・任意）</label>
       <input type="text" id="localUrl" placeholder="http://localhost:1234/v1" autocomplete="off">
       <p class="hint">同じPCで動くLM Studioの「ローカルサーバー」のアドレスだよ。LM Studio側でサーバーONとCORSをONにしてね。</p>
+      <label for="imgModel" style="margin-top:18px;display:block">🎨 絵筆（お絵かきモデル・任意）</label>
+      <input type="text" id="imgModel" placeholder="例: google/gemini-2.5-flash-image" autocomplete="off">
+      <p class="hint">OpenRouterの画像生成対応モデルのIDを入れると、うちの子たちが自分の意思で絵を描けるようになるよ（空にするとオフ）。描いた絵はチャットに飾られて、その部屋のアルバム帳にも保存されるよ。</p>
       <div class="credits" id="credits" style="display:none"></div>
       <div class="row" style="margin-top:8px">
         <button class="btn" id="checkCredits">💰 残高を確認</button>
@@ -1274,7 +1277,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.23.1 ─ お医者さんごっこ、はじめるよ。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.24 ─ うちの子が、絵筆をとる。</p>
   </div>
 </aside>
 
@@ -1750,6 +1753,19 @@ function addBubble(role, content, usage, imgId, speaker, entry){
     bubble.className = "msg assistant";
     bubble.innerHTML = renderMd(content);
     bubble.style.whiteSpace = "normal";
+    if(entry && entry.imgId){
+      const im = document.createElement("img");
+      im.className = "chatimg";
+      im.alt = "描いた絵";
+      imgGet(entry.imgId).then(rec => {
+        if(rec && rec.dataUrl){
+          im.src = rec.dataUrl;
+          if(chatEl.scrollHeight - chatEl.scrollTop - chatEl.clientHeight < 200) scrollBottom();
+        }
+        else im.remove();
+      }).catch(() => im.remove());
+      bubble.prepend(im);
+    }
     row.appendChild(head);
     row.appendChild(bubble);
     chatEl.appendChild(row);
@@ -2521,6 +2537,10 @@ function buildSystem(room){
       }
     }
   }
+  if(global.imgModel && global.apiKey){
+    sys += "\n\n# 絵筆\n";
+    sys += "あなたはツール oekaki で絵を描けます。絵を頼まれた時や、言葉より絵で見せたい時に使ってください。描いた絵は自動でチャットとアルバム帳に飾られます。もし「ものしり帳」に画風の資料があれば、先に読んでから描くと良いでしょう。\n";
+  }
   if(room.memoryEnabled){
     const shelf = loadShelf(room.id);
     sys += "\n\n# 記憶の棚（あなた専用のメモリ）\n";
@@ -2604,6 +2624,22 @@ function buildSystem(room){
 }
 
 /* ---------- ツール定義と実行 ---------- */
+const oekakiTools = [
+  {
+    type: "function",
+    function: {
+      name: "oekaki",
+      description: "絵筆で画像を1枚生成する。描きたい絵の内容・構図・画風をpromptに詳しく書く。完成した絵は自動でチャットとアルバム帳に飾られる。",
+      parameters: {
+        type: "object",
+        properties: {
+          prompt: { type: "string", description: "描きたい絵の詳しい説明（内容・構図・画風・色づかいなど）" }
+        },
+        required: ["prompt"]
+      }
+    }
+  }
+];
 const monoTools = [
   {
     type: "function",
@@ -2766,6 +2802,7 @@ const kanriTools = [
 
 function buildTools(room){
   const tools = [];
+  if(global.imgModel && global.apiKey && !room.isHiroba) tools.push(...oekakiTools);
   if(!room.isHiroba && loadMono(room.id).items.length) tools.push(...monoTools);
   if(room.memoryEnabled) tools.push(...memoryTools);
   if(room.diaryEnabled) tools.push(...diaryTools);
@@ -2774,6 +2811,41 @@ function buildTools(room){
   return tools;
 }
 
+async function execOekaki(room, args){
+  const prompt = (args && args.prompt) ? String(args.prompt) : "";
+  if(!prompt) return { result: "エラー: promptがありません", note: null };
+  if(!global.imgModel || !global.apiKey) return { result: "エラー: 絵筆（お絵かきモデル）が設定されていません", note: null };
+  try{
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + global.apiKey },
+      body: JSON.stringify({
+        model: global.imgModel,
+        messages: [{ role: "user", content: prompt }],
+        modalities: ["image", "text"]
+      })
+    });
+    if(!res.ok) return { result: "エラー: 絵筆が使えなかった（HTTP " + res.status + "）。⚙️のモデルIDを確かめてみて", note: null };
+    const j = await res.json();
+    const msg = j.choices && j.choices[0] && j.choices[0].message;
+    const url = msg && msg.images && msg.images[0] && msg.images[0].image_url && msg.images[0].image_url.url;
+    if(!url) return { result: "エラー: 絵が返ってこなかった。画像生成対応のモデルか確かめてみて", note: null };
+    const imgId = uid();
+    try{ await imgPut({ id: imgId, roomId: room.id, dataUrl: url, name: "oekaki" }); }catch(e){}
+    try{
+      const item = { id: uid(), roomId: room.id, dataUrl: url, caption: "🎨 " + prompt.slice(0, 80), shotAt: Date.now(), ts: Date.now() };
+      await albumPut(item);
+      if(typeof albumItems !== "undefined" && Array.isArray(albumItems)) albumItems.push(item);
+    }catch(e){}
+    const entry = { role: "assistant", content: "（🎨 ここで絵を1枚描いて見せた）", ts: Date.now(), imgId, model: global.imgModel };
+    chat.push(entry);
+    saveChat();
+    return { result: "OK: 絵が完成して、チャットとアルバム帳に飾られました。絵を見せた前提で会話を続けてください",
+             note: "🎨 " + room.name + "が絵を描いたよ（アルバム帳にも保存）" };
+  }catch(e){
+    return { result: "エラー: 絵筆がうまく動かなかった（" + ((e && e.message) || "不明") + "）", note: null };
+  }
+}
 function execTool(room, name, args){
   const normText = s => String(s).replace(/\\n/g, "\n");
   const shelf = loadShelf(room.id);
@@ -3238,6 +3310,9 @@ async function sendText(text, apiOnlyExtra, image, opts){
       if(m.role === "user" && m.txt){
         c += "\n\n---\n📄 このとき渡されたテキストファイル「" + (m.txtName || "") + "」:\n" + m.txt;
       }
+      if(m.role === "assistant" && m.imgId){
+        c += "\n（この絵はその場かぎりで、今はもう見えないよ。アルバム帳には残っているよ）";
+      }
       messages.push({ role:m.role, content:c });
     }
   }
@@ -3307,7 +3382,18 @@ async function sendText(text, apiOnlyExtra, image, opts){
       for(const tc of r.toolCalls){
         let args = {};
         try{ args = JSON.parse(tc.function.arguments || "{}"); }catch(e){}
-        const { result, note } = execTool(currentRoom, tc.function.name, args);
+        let exeRes;
+        if(tc.function.name === "oekaki"){
+          const paint = document.createElement("div");
+          paint.className = "typing";
+          paint.textContent = currentRoom.name + "が絵筆をとった";
+          chatEl.appendChild(paint); scrollBottom();
+          exeRes = await execOekaki(currentRoom, args);
+          if(paint.parentNode) paint.remove();
+        }else{
+          exeRes = execTool(currentRoom, tc.function.name, args);
+        }
+        const { result, note } = exeRes;
         messages.push({ role:"tool", tool_call_id: tc.id, content: result });
         if(note){
           if(typing.parentNode) typing.remove();
@@ -4306,6 +4392,7 @@ async function renderStorageMeter(){
 $("globalSettingsBtn").onclick = () => {
   $("apiKey").value = global.apiKey;
   $("localUrl").value = global.localUrl || "";
+  $("imgModel").value = global.imgModel || "";
   renderTextPrefs();
   renderViewportDiag();
   renderBackupHint();
@@ -4316,6 +4403,7 @@ $("globalSettingsBtn").onclick = () => {
 $("saveGlobalBtn").onclick = () => {
   global.apiKey = $("apiKey").value.trim();
   global.localUrl = $("localUrl").value.trim();
+  global.imgModel = $("imgModel").value.trim();
   save(LS_GLOBAL, global);
   renderLobby();
   closePanels();
@@ -4346,6 +4434,28 @@ $("lhRange").oninput = () => {
   save(LS_GLOBAL, global); applyTextPrefs(); renderTextPrefs();
 };
 applyTextPrefs();
+/* ---------- v0.24 ホーム画面アプリの背丈補正 ----------
+   iOSが「画面いっぱいのキャンバス」をくれるのに中身の高さを
+   ステータスバー抜きで計算するバグ対策。差＝上の安全余白と
+   一致した時だけ、本体をその分だけ下に伸ばすよ */
+let standaloneGapPx = 0;
+function measureSafeTop(){
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:fixed;left:-9999px;padding-top:env(safe-area-inset-top)";
+  document.body.appendChild(probe);
+  const v = parseFloat(getComputedStyle(probe).paddingTop) || 0;
+  probe.remove();
+  return v;
+}
+function applyBodyHeight(px){
+  document.body.style.height = px ? px : (standaloneGapPx ? "calc(100% + " + standaloneGapPx + "px)" : "");
+}
+function fixStandaloneGap(){
+  if(navigator.standalone !== true){ standaloneGapPx = 0; return; }
+  const diff = screen.height - window.innerHeight;
+  const saTop = measureSafeTop();
+  standaloneGapPx = (diff > 0 && saTop > 0 && Math.abs(diff - saTop) <= 3) ? diff : 0;
+}
 /* ---------- v0.23.1 画面の診断 ---------- */
 function renderViewportDiag(){
   const el = $("viewportDiag");
@@ -4366,6 +4476,7 @@ function renderViewportDiag(){
       "本体(body): " + Math.round(document.body.getBoundingClientRect().height),
       "安全余白: 上 " + saT + " / 下 " + saB,
       "起動モード: " + (navigator.standalone === true ? "ホーム画面アプリ" : (navigator.standalone === false ? "ブラウザ" : "不明")),
+      "背丈の補正: " + (standaloneGapPx ? "+" + standaloneGapPx + "px 適用中" : "なし"),
     ];
     el.textContent = lines.join("\n");
   }catch(e){ el.textContent = "計測に失敗しちゃった: " + e.message; }
@@ -4377,6 +4488,8 @@ function renderViewportDiag(){
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
+    fixStandaloneGap();
+    applyBodyHeight("");
     if(++n >= 8) clearInterval(t);
   }, 150);
 })();
@@ -4391,7 +4504,8 @@ if(window.visualViewport){
     const editing = ae && (ae.tagName === "TEXTAREA" || ae.tagName === "INPUT");
     /* vv.heightは拡大率ぶん小さく見えるので、scaleを掛けて実寸に戻して比べる */
     const kbOpen = editing && (window.innerHeight - vv.height * vv.scale) > 60;
-    document.body.style.height = kbOpen ? (vv.height + "px") : "";
+    if(!kbOpen) fixStandaloneGap();
+    applyBodyHeight(kbOpen ? (vv.height + "px") : "");
     /* iOSがフォーカス欄を見せようと勝手にページをずらすので、毎回打ち消す */
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
