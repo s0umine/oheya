@@ -433,6 +433,23 @@
     max-width:min(100%,260px);border-radius:10px;display:block;
     margin-bottom:6px;background:rgba(0,0,0,.2);
   }
+  /* ---------- v0.27 レターボックス ---------- */
+  .letter-card{
+    position:relative;background:var(--surface);
+    border:1px solid var(--line);border-radius:4px 14px 4px 14px;
+    padding:18px 18px 14px;margin-bottom:16px;
+    font-size:14px;line-height:2;white-space:pre-wrap;word-break:break-word;
+    box-shadow:0 2px 10px rgba(0,0,0,.18);
+  }
+  .letter-card::before{
+    content:"💌";position:absolute;top:-10px;right:14px;font-size:18px;
+  }
+  .letter-card .lc-head{
+    font-size:10.5px;color:var(--muted);margin-bottom:12px;
+    padding-bottom:8px;border-bottom:1px dashed var(--line);
+    display:flex;justify-content:space-between;align-items:center;gap:8px;
+  }
+  .letter-card .lc-head .mbtn{font-size:12px}
   /* ---------- v0.25 画像の拡大表示 ---------- */
   #lightbox{position:fixed;inset:0;z-index:200;background:rgba(8,6,14,.92);
     display:flex;flex-direction:column}
@@ -993,6 +1010,7 @@
   <div class="room-menu" id="roomMenu">
     <button class="menu-item" id="shelfBtn">📚 記憶の棚</button>
     <button class="menu-item" id="monoBtn">📖 ものしり帳</button>
+    <button class="menu-item" id="letterBoxBtn">💌 レターボックス</button>
     <button class="menu-item" id="diaryBtn">📔 日記帳</button>
     <button class="menu-item" id="ayumiBtn">📜 あゆみ帳</button>
     <button class="menu-item" id="albumBtn">📖 アルバム帳</button>
@@ -1302,7 +1320,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.26 ─ おかえり、お手紙が届いてるよ。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.27 ─ 手紙は、箱にしまって何度でも。</p>
   </div>
 </aside>
 
@@ -1316,6 +1334,18 @@
     <button class="btn primary" id="threadNewBtn" style="width:100%">＋ 新しい会話をはじめる</button>
     <div id="threadList" style="margin-top:14px"></div>
     <p class="hint" style="margin-top:14px">この部屋の会話のとびら。話題ごとに分けても、記憶の棚や日記帳はこの子のものだから、どのとびらの中でもちゃんと覚えているよ。</p>
+  </div>
+</aside>
+
+<!-- ========== レターボックス ========== -->
+<aside class="panel" id="letterPanel" aria-label="レターボックス">
+  <div class="panel-head">
+    <h2>💌 レターボックス</h2>
+    <button class="iconbtn" data-close aria-label="閉じる">✕</button>
+  </div>
+  <div class="panel-body">
+    <p class="hint" style="margin-bottom:14px">この子から届いたお手紙の保管箱だよ。会話が流れていっても、手紙はここにずっと残るの。</p>
+    <div id="letterList"></div>
   </div>
 </aside>
 
@@ -1592,6 +1622,11 @@ function applyThemeFor(room){ applyColors(themeColorsFor(room)); }
 /* ---------- 記憶の棚データ ---------- */
 function loadShelf(roomId){ return load(shelfKey(roomId)) || { nextId: 1, items: [] }; }
 function saveShelf(roomId, shelf){ return save(shelfKey(roomId), shelf); }
+
+/* ---------- レターボックスデータ（届いたお手紙の保管箱） ---------- */
+function letterKey(roomId){ return "oheya_letters_" + roomId; }
+function loadLetters(roomId){ return load(letterKey(roomId)) || { items: [] }; }
+function saveLetters(roomId, box){ return save(letterKey(roomId), box); }
 
 /* ---------- ものしり帳データ（部屋ごとの参考資料） ---------- */
 function monoKey(roomId){ return "oheya_mono_" + roomId; }
@@ -2515,6 +2550,7 @@ function openRoom(id, threadId){
   renderSpeakerBar();
   $("omiyageBtn").hidden = !currentRoom.isHiroba;
   $("monoBtn").hidden = !!currentRoom.isHiroba;
+  $("letterBoxBtn").hidden = !!currentRoom.isHiroba;
   maybeDeliverLetter(currentRoom);
   if(currentRoom.isHiroba){
     if(!currentThread.members) openHirobaPicker();
@@ -3573,6 +3609,63 @@ $("monoAddBtn").onclick = () => {
   renderMono();
 };
 $("monoBtn").onclick = () => { renderMono(); openPanel($("monoPanel")); };
+/* ---------- v0.27 レターボックス ---------- */
+function collectOldLetters(){
+  /* 保管箱ができる前に届いた手紙を、全スレッドから拾って箱に入れるよ */
+  if(!currentRoom || currentRoom.isHiroba) return;
+  const box = loadLetters(currentRoom.id);
+  const known = new Set(box.items.map(x => x.ts));
+  let added = 0;
+  for(const t of (currentRoom.threads || [])){
+    const arr = load(threadKey(currentRoom.id, t.id)) || [];
+    for(const m of arr){
+      if(m && m.letter && m.role === "assistant" && m.content && !known.has(m.ts)){
+        box.items.push({ id: uid(), content: m.content, ts: m.ts || Date.now(), model: m.model || "" });
+        known.add(m.ts);
+        added++;
+      }
+    }
+  }
+  if(added){
+    box.items.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    saveLetters(currentRoom.id, box);
+  }
+}
+function renderLetterBox(){
+  const boxEl = $("letterList");
+  boxEl.innerHTML = "";
+  if(!currentRoom) return;
+  collectOldLetters();
+  const box = loadLetters(currentRoom.id);
+  if(box.items.length === 0){
+    boxEl.innerHTML = '<p class="hint">まだお手紙は届いていないよ。プロフィールの「💌 お手紙」がオンなら、しばらくぶりに訪ねた時に届くかも。</p>';
+    return;
+  }
+  for(const it of [...box.items].reverse()){
+    const card = document.createElement("div");
+    card.className = "letter-card";
+    const head = document.createElement("div");
+    head.className = "lc-head";
+    const info = document.createElement("span");
+    info.textContent = fmtTs(it.ts) + (it.model ? " ・ " + String(it.model).split("/").pop() : "");
+    const btns = document.createElement("span");
+    const cp = miniBtn("⧉", "この手紙をコピー", e => copyToClip(it.content, e.currentTarget));
+    const del = miniBtn("🗑", "この手紙を手放す", () => {
+      if(!confirm("このお手紙を手放すよ。box からは消えるけど、いい？".replace("box ", "レターボックス"))) return;
+      const b = loadLetters(currentRoom.id);
+      b.items = b.items.filter(x => x.id !== it.id);
+      saveLetters(currentRoom.id, b);
+      renderLetterBox();
+    });
+    btns.appendChild(cp); btns.appendChild(del);
+    head.appendChild(info); head.appendChild(btns);
+    const body = document.createElement("div");
+    body.textContent = it.content;
+    card.appendChild(head); card.appendChild(body);
+    boxEl.appendChild(card);
+  }
+}
+$("letterBoxBtn").onclick = () => { renderLetterBox(); openPanel($("letterPanel")); };
 $("shelfAddBtn").onclick = () => {
   const content = prompt("棚に書き足す内容は?");
   if(!content || !content.trim()) return;
@@ -4299,6 +4392,7 @@ $("deleteRoomBtn").onclick = () => {
     del(diaryKey(currentRoom.id));
     del(ayumiKey(currentRoom.id));
     del(monoKey(currentRoom.id));
+    del(letterKey(currentRoom.id));
     albumDeleteRoom(currentRoom.id).catch(()=>{});
     imgDeleteRoom(currentRoom.id).catch(()=>{});
     rooms = rooms.filter(r => r.id !== currentRoom.id);
@@ -4602,7 +4696,7 @@ if(window.visualViewport){
 }
 $("wipeBtn").onclick = async () => {
   if(confirm("全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーを、この端末から全部消すよ。本当にいい?")){
-    for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); del(monoKey(r.id)); }
+    for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); del(monoKey(r.id)); del(letterKey(r.id)); }
     del(LS_ROOMS); del(LS_GLOBAL);
     del("oheya_settings_v1"); del("oheya_chat_v1");
     try{ await kvClear(); }catch(e){}
@@ -4637,7 +4731,7 @@ $("exportAllBtn").onclick = exportAllMd;
 async function makeBackup(){
   const data = {
     app: "oheya", version: 10, exportedAt: Date.now(),
-    rooms, chats: {}, shelves: {}, diaries: {}, ayumis: {}, monos: {}, avatars: {}, albums: [], chatimgs: []
+    rooms, chats: {}, shelves: {}, diaries: {}, ayumis: {}, monos: {}, letters: {}, avatars: {}, albums: [], chatimgs: []
   };
   for(const r of rooms){
     data.chats[r.id] = {};
@@ -4646,6 +4740,7 @@ async function makeBackup(){
     }
     data.shelves[r.id] = loadShelf(r.id);
     data.monos[r.id] = loadMono(r.id);
+    data.letters[r.id] = loadLetters(r.id);
     data.diaries[r.id] = loadDiary(r.id);
     data.ayumis[r.id] = loadAyumi(r.id);
     const av = loadRaw(avatarKey(r.id));
@@ -4740,7 +4835,7 @@ $("restoreInput").addEventListener("change", () => {
     const when = obj.exportedAt ? new Date(obj.exportedAt).toLocaleString("ja-JP") : "不明";
     if(!confirm("バックアップ（" + obj.rooms.length + "部屋・" + when + "保存）から復元するよ。\n今この端末にあるデータは置きかわるの。本当にいい?\n（心配なら先に💾で今の状態も保存してね）")) return;
     /* 今のデータを片付けてから復元 */
-    for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); del(monoKey(r.id)); }
+    for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); del(monoKey(r.id)); del(letterKey(r.id)); }
     rooms = obj.rooms;
     save(LS_ROOMS, rooms);
     let photoTrouble = false;
@@ -4755,6 +4850,7 @@ $("restoreInput").addEventListener("change", () => {
       }
       save(shelfKey(r.id), (obj.shelves && obj.shelves[r.id]) || { nextId:1, items:[] });
       save(monoKey(r.id), (obj.monos && obj.monos[r.id]) || { nextId:1, items:[] });
+      save(letterKey(r.id), (obj.letters && obj.letters[r.id]) || { items:[] });
       save(diaryKey(r.id), (obj.diaries && obj.diaries[r.id]) || { nextId:1, items:[] });
       save(ayumiKey(r.id), (obj.ayumis && obj.ayumis[r.id]) || { nextId:1, items:[] });
       const av = obj.avatars && obj.avatars[r.id];
@@ -4997,6 +5093,9 @@ async function maybeDeliverLetter(room){
       if(text){
         const entry = { role: "assistant", content: text, ts: Date.now(), model: room.model, letter: true };
         if(r.reasoning) entry.reasoning = r.reasoning;
+        const box = loadLetters(room.id);
+        box.items.push({ id: uid(), content: text, ts: entry.ts, model: room.model });
+        saveLetters(room.id, box);
         if(stillHere){
           chat.push(entry);
           saveChat();
