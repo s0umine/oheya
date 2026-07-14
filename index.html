@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" id="themeColorMeta" content="#232030">
 <title>おへや v0.20.1</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
@@ -431,6 +433,10 @@
     max-width:min(100%,260px);border-radius:10px;display:block;
     margin-bottom:6px;background:rgba(0,0,0,.2);
   }
+  /* ---------- v0.24.1 絵筆ピッカー ---------- */
+  #imgModelList{display:none;margin-top:8px;max-height:260px;overflow-y:auto;
+    background:var(--surface);border:1px solid var(--line);border-radius:12px}
+  #imgModelList.show{display:block}
   /* ---------- v0.23 ものしり帳 ---------- */
   .mono-item{background:var(--surface);border:1px solid var(--line);
     border-radius:12px;padding:10px 12px;margin-bottom:10px}
@@ -1220,7 +1226,9 @@
       <p class="hint">同じPCで動くLM Studioの「ローカルサーバー」のアドレスだよ。LM Studio側でサーバーONとCORSをONにしてね。</p>
       <label for="imgModel" style="margin-top:18px;display:block">🎨 絵筆（お絵かきモデル・任意）</label>
       <input type="text" id="imgModel" placeholder="例: google/gemini-2.5-flash-image" autocomplete="off">
-      <p class="hint">OpenRouterの画像生成対応モデルのIDを入れると、うちの子たちが自分の意思で絵を描けるようになるよ（空にするとオフ）。描いた絵はチャットに飾られて、その部屋のアルバム帳にも保存されるよ。</p>
+      <button class="btn" id="imgModelsBtn" style="width:100%;margin-top:8px">🎨 お絵かきできるモデルをさがす</button>
+      <div id="imgModelList"></div>
+      <p class="hint">OpenRouterの画像生成対応モデルを設定すると、うちの子たちが自分の意思で絵を描けるようになるよ（空にするとオフ）。描いた絵はチャットに飾られて、その部屋のアルバム帳にも保存されるよ。</p>
       <div class="credits" id="credits" style="display:none"></div>
       <div class="row" style="margin-top:8px">
         <button class="btn" id="checkCredits">💰 残高を確認</button>
@@ -1277,7 +1285,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.24 ─ うちの子が、絵筆をとる。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.24.1 ─ 画面のすみずみまで、うちの色。</p>
   </div>
 </aside>
 
@@ -1548,6 +1556,9 @@ function applyColors(c){
   s.setProperty("--lamp", c.lamp);
   s.setProperty("--lamp-soft", hexSoft(c.lamp));
   s.setProperty("--user", c.user);
+  /* 描画領域の外側（ステータスバー周りや隙間）もアプリの色に染める */
+  const tm = document.getElementById("themeColorMeta");
+  if(tm && c.bg) tm.setAttribute("content", c.bg);
 }
 function applyThemeFor(room){ applyColors(themeColorsFor(room)); }
 
@@ -4400,6 +4411,35 @@ $("globalSettingsBtn").onclick = () => {
   renderStorageMeter();
   openPanel($("globalPanel"));
 };
+$("imgModelsBtn").onclick = async () => {
+  const list = $("imgModelList");
+  list.innerHTML = '<div class="model-item">画像生成のできるモデルをさがしてる…</div>';
+  list.classList.add("show");
+  try{
+    const models = await fetchModels();
+    const hits = models.filter(m => {
+      const out = (m.architecture && (m.architecture.output_modalities || [])) || [];
+      return out.includes("image");
+    });
+    if(hits.length === 0){
+      list.innerHTML = '<div class="model-item">見つからなかった…IDを直接入力してもOKだよ。</div>';
+      return;
+    }
+    list.innerHTML = "";
+    for(const m of hits){
+      const item = document.createElement("div");
+      item.className = "model-item";
+      item.innerHTML = "🎨 " + esc(m.name || m.id) + '<span class="mid">' + esc(m.id) + "</span>";
+      item.onclick = () => {
+        $("imgModel").value = m.id;
+        list.classList.remove("show");
+      };
+      list.appendChild(item);
+    }
+  }catch(e){
+    list.innerHTML = '<div class="model-item">一覧を取得できなかった…IDを直接入力して保存してね。</div>';
+  }
+};
 $("saveGlobalBtn").onclick = () => {
   global.apiKey = $("apiKey").value.trim();
   global.localUrl = $("localUrl").value.trim();
@@ -4448,7 +4488,9 @@ function measureSafeTop(){
   return v;
 }
 function applyBodyHeight(px){
-  document.body.style.height = px ? px : (standaloneGapPx ? "calc(100% + " + standaloneGapPx + "px)" : "");
+  /* 伸ばした分は描画領域の外ではみ出して切られると判明したので、補正は当てない
+     （standaloneGapPxは診断表示のためだけに残しているよ） */
+  document.body.style.height = px ? px : "";
 }
 function fixStandaloneGap(){
   if(navigator.standalone !== true){ standaloneGapPx = 0; return; }
@@ -4476,7 +4518,7 @@ function renderViewportDiag(){
       "本体(body): " + Math.round(document.body.getBoundingClientRect().height),
       "安全余白: 上 " + saT + " / 下 " + saB,
       "起動モード: " + (navigator.standalone === true ? "ホーム画面アプリ" : (navigator.standalone === false ? "ブラウザ" : "不明")),
-      "背丈の補正: " + (standaloneGapPx ? "+" + standaloneGapPx + "px 適用中" : "なし"),
+      "みじかい分: " + (standaloneGapPx ? standaloneGapPx + "px（iOSの計算バグ）" : "なし"),
     ];
     el.textContent = lines.join("\n");
   }catch(e){ el.textContent = "計測に失敗しちゃった: " + e.message; }
