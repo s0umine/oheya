@@ -1352,7 +1352,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.29.1 ─ 道具は棚のすみに、そっと。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.29.2 ─ ゴミ箱も、線のなかまに。</p>
   </div>
 </aside>
 
@@ -3610,7 +3610,7 @@ function renderShelf(){
     editBtn.className = "mbtn"; editBtn.textContent = "✎";
     editBtn.title = "直す"; editBtn.setAttribute("aria-label", "この記憶を直す");
     const delBtn = document.createElement("button");
-    delBtn.className = "mbtn"; delBtn.textContent = "🗑";
+    delBtn.className = "mbtn"; delBtn.textContent = "✕";
     delBtn.title = "捨てる"; delBtn.setAttribute("aria-label", "この記憶を捨てる");
     actions.appendChild(editBtn); actions.appendChild(delBtn);
     item.appendChild(sid); item.appendChild(content); item.appendChild(actions);
@@ -3662,7 +3662,7 @@ function renderMono(){
     const row = document.createElement("div");
     row.className = "row"; row.style.marginTop = "8px"; row.style.justifyContent = "flex-end";
     const del = document.createElement("button");
-    del.className = "mbtn"; del.textContent = "🗑";
+    del.className = "mbtn"; del.textContent = "✕";
     del.title = "削除"; del.setAttribute("aria-label", "このページを削除");
     del.onclick = () => {
       if(!confirm("「" + it.title + "」のページを破くよ。いい？")) return;
@@ -3731,7 +3731,7 @@ function letterCard(it){
     renderLetterBox();
   });
   const cp = miniBtn("⧉", "この手紙をコピー", e => copyToClip(it.content, e.currentTarget));
-  const del = miniBtn("🗑", "この手紙を手放す", () => {
+  const del = miniBtn("✕", "この手紙を手放す", () => {
     if(!confirm("このお手紙を手放すよ。レターボックスから消えるけど、いい？")) return;
     const b = loadLetters(currentRoom.id);
     b.items = b.items.filter(x => x.id !== it.id);
@@ -3848,7 +3848,7 @@ function renderDiary(){
     text.innerHTML = renderMd(it.content);
     const delBtn = document.createElement("button");
     delBtn.className = "ddel mbtn";
-    delBtn.textContent = "🗑";
+    delBtn.textContent = "✕";
     delBtn.title = "この日記を破る";
     delBtn.setAttribute("aria-label", "日記「" + it.title + "」を削除");
     delBtn.onclick = () => {
@@ -3999,7 +3999,7 @@ function renderAlbumBook(box, items, turnDir){
   }else{
     const cap = document.createElement("div");
     cap.className = "pcaption" + (it.caption ? "" : " empty");
-    cap.textContent = it.caption || "（コメントはまだないよ。✏️で書き添えてね）";
+    cap.textContent = it.caption || "（コメントはまだないよ。✎で書き添えてね）";
     page.appendChild(cap);
 
     const editBtn = document.createElement("button");
@@ -4007,7 +4007,7 @@ function renderAlbumBook(box, items, turnDir){
     editBtn.title = "書き添える"; editBtn.setAttribute("aria-label", "コメントを書き添える");
     editBtn.onclick = () => { albumEditing = true; renderAlbum(); };
     const delBtn = document.createElement("button");
-    delBtn.className = "mbtn"; delBtn.textContent = "🗑";
+    delBtn.className = "mbtn"; delBtn.textContent = "✕";
     delBtn.title = "手放す"; delBtn.setAttribute("aria-label", "この写真を手放す");
     delBtn.title = "この写真をはがす";
     delBtn.onclick = async () => {
@@ -4155,7 +4155,7 @@ function renderAyumi(){
     text.innerHTML = renderMd(it.content);
     const delBtn = document.createElement("button");
     delBtn.className = "adel mbtn";
-    delBtn.textContent = "🗑";
+    delBtn.textContent = "✕";
     delBtn.title = "この出来事を消す";
     delBtn.setAttribute("aria-label", "あゆみ「" + it.title + "」を削除");
     delBtn.onclick = () => {
@@ -5469,7 +5469,7 @@ function renderThreadPanel(){
     const msgCount = c.filter(m => m.role === "user" || m.role === "assistant").length;
     foot.innerHTML = '<span>' + fmtWhenTime(t.updatedAt) + '</span><span>' + msgCount + '通</span><span class="spacer"></span>';
     const ren = document.createElement("button");
-    ren.className = "tact"; ren.textContent = "✏️"; ren.title = "なまえを変える";
+    ren.className = "tact"; ren.textContent = "✎"; ren.title = "なまえを変える";
     ren.setAttribute("aria-label", "この会話のなまえを変える");
     ren.onclick = e => {
       e.stopPropagation();
@@ -5482,7 +5482,7 @@ function renderThreadPanel(){
       }
     };
     const delBtn = document.createElement("button");
-    delBtn.className = "tact"; delBtn.textContent = "🗑"; delBtn.title = "この会話を消す";
+    delBtn.className = "tact"; delBtn.textContent = "✕"; delBtn.title = "この会話を消す";
     delBtn.setAttribute("aria-label", "この会話を消す");
     delBtn.onclick = e => {
       e.stopPropagation();
