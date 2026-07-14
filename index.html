@@ -438,6 +438,51 @@
     max-width:min(100%,260px);border-radius:10px;display:block;
     margin-bottom:6px;background:rgba(0,0,0,.2);
   }
+  /* ---------- v0.30 🖼 部屋の壁紙 ---------- */
+  #chatBg{
+    position:absolute;inset:0;z-index:0;display:none;
+    background-size:cover;background-position:center;
+  }
+  #roomScreen.has-bg #chatBg{display:block}
+  #roomScreen.has-bg > header,
+  #roomScreen.has-bg > #chat,
+  #roomScreen.has-bg > footer{position:relative;z-index:1}
+  #roomScreen.has-bg .msg.assistant{
+    background:var(--paper);
+    background:color-mix(in srgb, var(--paper) var(--bgmix,68%), transparent);
+    -webkit-backdrop-filter:blur(var(--bgblur,10px));
+    backdrop-filter:blur(var(--bgblur,10px));
+  }
+  #roomScreen.has-bg .msg.user{
+    background:var(--user);
+    background:color-mix(in srgb, var(--user) var(--bgmix,68%), transparent);
+    -webkit-backdrop-filter:blur(var(--bgblur,10px));
+    backdrop-filter:blur(var(--bgblur,10px));
+  }
+  #roomScreen.has-bg .thought details{
+    background:var(--surface);
+    background:color-mix(in srgb, var(--surface) 78%, transparent);
+    -webkit-backdrop-filter:blur(var(--bgblur,10px));
+    backdrop-filter:blur(var(--bgblur,10px));
+  }
+  #roomScreen.has-bg .meta,
+  #roomScreen.has-bg .typing,
+  #roomScreen.has-bg .welcome{text-shadow:0 1px 4px rgba(0,0,0,.55)}
+  .bg-preview{
+    width:100%;height:110px;border-radius:12px;
+    border:1px dashed var(--line);cursor:pointer;
+    background-size:cover;background-position:center;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--muted);font-size:12.5px;
+  }
+  .bg-preview.has{border-style:solid;color:transparent;text-shadow:none}
+  .bg-actions{display:flex;gap:8px;margin-top:8px}
+  .bg-actions .btn{font-size:12.5px;padding:7px 12px}
+  .bg-sliders{margin-top:12px;display:flex;flex-direction:column;gap:10px}
+  .bg-sliders label{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--muted)}
+  .bg-sliders input[type=range]{flex:1;min-width:0}
+  .bg-sliders .bg-val{min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
+
   /* ---------- v0.27 レターボックス ---------- */
   .letter-card{
     position:relative;background:var(--surface);
@@ -1022,6 +1067,7 @@
 
 <!-- ========== 各部屋 ========== -->
 <div class="screen" id="roomScreen">
+  <div id="chatBg" aria-hidden="true"></div>
   <header>
     <button class="iconbtn" id="backBtn" title="管理人室へ戻る">←</button>
     <div class="plate">
@@ -1108,6 +1154,26 @@
         <p class="hint">あかりはボタンや飾りに、ふきだしはあなたの吹き出しに使うよ。ふきだしは白文字がのるから、暗めの色がおすすめ。</p>
       </div>
       <p class="hint">この子の部屋のランプの色を選べるよ。選ぶとその場で灯りが変わるから、雰囲気を見ながら決めてね。🎨は自分で色を作れるの。</p>
+    </div>
+    <div class="field">
+      <label>🖼 部屋の壁紙（背景画像）</label>
+      <div class="bg-preview" id="bgPreview">タップして壁紙をえらぶ</div>
+      <div class="bg-actions">
+        <button class="btn" id="bgPickBtn">🖼 壁紙をえらぶ</button>
+        <button class="btn" id="bgRemoveBtn">はずす</button>
+      </div>
+      <div class="bg-sliders" id="bgSliders" style="display:none">
+        <label>ふきだしの濃さ
+          <input type="range" id="bgMixRange" min="30" max="100" step="5">
+          <span class="bg-val" id="bgMixVal"></span>
+        </label>
+        <label>すりガラスのくもり
+          <input type="range" id="bgBlurRange" min="0" max="24" step="2">
+          <span class="bg-val" id="bgBlurVal"></span>
+        </label>
+      </div>
+      <input type="file" id="bgInput" accept="image/*" hidden>
+      <p class="hint">部屋の背景に写真を飾れるよ。ふきだしはうっすら透けて、すりガラスごしに壁紙が見えるの。濃さを下げるほど透けて、くもり0だと素通しのうっすら透過になるよ。保存してから部屋で確かめてね。</p>
     </div>
     <div class="field">
       <label for="modelSearch">モデル</label>
@@ -1352,7 +1418,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.29.3 ─ 記録は、その場でしまう。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.30 ─ 記録は、その場でしまう。</p>
   </div>
 </aside>
 
@@ -1433,6 +1499,7 @@ const LS_ROOMS  = "oheya_rooms_v2";
 const chatKey   = id => "oheya_chat_v2_" + id;
 const threadKey = (roomId, threadId) => "oheya_chat_v3_" + roomId + "_" + threadId;
 const avatarKey = id => "oheya_avatar_v2_" + id;
+const bgKey     = id => "oheya_bg_v1_" + id;
 const shelfKey  = id => "oheya_shelf_v2_" + id;
 const diaryKey  = id => "oheya_diary_v2_" + id;
 const ayumiKey  = id => "oheya_ayumi_v1_" + id;
@@ -1441,7 +1508,7 @@ const ayumiKey  = id => "oheya_ayumi_v1_" + id;
    大物（会話・記憶の棚・日記・あゆみ・顔写真）は「くら」（IndexedDB・GB級）、
    小物（部屋リスト・全体設定）は「たんす」（localStorage）に住むよ。
    くらの中身は起動時にぜんぶ机（memCache）へ広げるから、読み書きは今まで通りの速さ */
-const BIG_PREFIXES = ["oheya_chat_v3_", "oheya_chat_v2_", "oheya_shelf_v2_", "oheya_diary_v2_", "oheya_ayumi_v1_", "oheya_avatar_v2_"];
+const BIG_PREFIXES = ["oheya_chat_v3_", "oheya_chat_v2_", "oheya_shelf_v2_", "oheya_diary_v2_", "oheya_ayumi_v1_", "oheya_avatar_v2_", "oheya_bg_v1_"];
 function isBigKey(k){ return typeof k === "string" && BIG_PREFIXES.some(p => k.startsWith(p)); }
 const memCache = new Map();          /* くらの中身（文字列のまま） */
 const pendingWrites = new Set();     /* まだ書き込み中のくら作業 */
@@ -1651,6 +1718,21 @@ function applyColors(c){
 }
 function applyThemeFor(room){ applyColors(themeColorsFor(room)); }
 
+/* ---------- v0.30 🖼 部屋の壁紙 ---------- */
+function applyRoomBg(room){
+  const scr = $("roomScreen"), layer = $("chatBg");
+  const bg = room ? loadRaw(bgKey(room.id)) : null;
+  if(bg){
+    layer.style.backgroundImage = 'url("' + bg + '")';
+    scr.style.setProperty("--bgmix", (room.bgMix == null ? 68 : room.bgMix) + "%");
+    scr.style.setProperty("--bgblur", (room.bgBlur == null ? 10 : room.bgBlur) + "px");
+    scr.classList.add("has-bg");
+  }else{
+    scr.classList.remove("has-bg");
+    layer.style.backgroundImage = "";
+  }
+}
+
 /* ---------- 記憶の棚データ ---------- */
 function loadShelf(roomId){ return load(shelfKey(roomId)) || { nextId: 1, items: [] }; }
 function saveShelf(roomId, shelf){ return save(shelfKey(roomId), shelf); }
@@ -1792,6 +1874,7 @@ let sending = false;
 let allModels = null;
 let pendingModel = null;
 let pendingPhoto = undefined;
+let pendingBg = undefined; /* undefined=変更なし / null=はずす / 文字列=新しい壁紙 */
 
 const $ = id => document.getElementById(id);
 const chatEl = $("chat"), inputEl = $("input"), sendBtn = $("send");
@@ -2623,6 +2706,7 @@ function openRoom(id, threadId){
   $("roomTitle").textContent = currentRoom.name;
   $("threadName").textContent = t.title;
   avatarInto($("headerAvatar"), currentRoom);
+  applyRoomBg(currentRoom);
   renderChat();
   showScreen("room");
   renderSpeakerBar();
@@ -4368,6 +4452,8 @@ function openProfile(){
     ? { id: currentRoom.model, name: currentRoom.modelName, provider: currentRoom.provider || "" }
     : null;
   pendingPhoto = undefined;
+  pendingBg = undefined;
+  renderBgField();
   pendingTheme = currentRoom.theme || "lamp";
   pendingCustom = {
     lamp: currentRoom.customLamp || "#F2A65A",
@@ -4393,6 +4479,57 @@ $("photoInput").addEventListener("change", () => {
   const img = new Image();
   const url = URL.createObjectURL(file);
   img.onload = () => { openCrop(img, url); $("photoInput").value = ""; };
+  img.onerror = () => { URL.revokeObjectURL(url); alert("この画像は読み込めなかったみたい…別の画像で試してみて。"); };
+  img.src = url;
+});
+
+/* ---------- v0.30 🖼 部屋の壁紙（プロフィール側） ---------- */
+function currentBgFor(){
+  if(pendingBg !== undefined) return pendingBg;
+  return currentRoom ? loadRaw(bgKey(currentRoom.id)) : null;
+}
+function renderBgField(){
+  const bg = currentBgFor();
+  const pv = $("bgPreview");
+  if(bg){
+    pv.style.backgroundImage = 'url("' + bg + '")';
+    pv.classList.add("has");
+    pv.textContent = "タップして壁紙をえらぶ";
+  }else{
+    pv.style.backgroundImage = "";
+    pv.classList.remove("has");
+    pv.textContent = "タップして壁紙をえらぶ";
+  }
+  $("bgSliders").style.display = bg ? "flex" : "none";
+  const mix = currentRoom && currentRoom.bgMix != null ? currentRoom.bgMix : 68;
+  const blur = currentRoom && currentRoom.bgBlur != null ? currentRoom.bgBlur : 10;
+  $("bgMixRange").value = mix;  $("bgMixVal").textContent = mix + "%";
+  $("bgBlurRange").value = blur; $("bgBlurVal").textContent = blur + "px";
+}
+$("bgMixRange").oninput = () => { $("bgMixVal").textContent = $("bgMixRange").value + "%"; };
+$("bgBlurRange").oninput = () => { $("bgBlurVal").textContent = $("bgBlurRange").value + "px"; };
+$("bgPreview").onclick = () => $("bgInput").click();
+$("bgPickBtn").onclick = () => $("bgInput").click();
+$("bgRemoveBtn").onclick = () => { pendingBg = null; renderBgField(); };
+$("bgInput").addEventListener("change", () => {
+  const file = $("bgInput").files[0];
+  $("bgInput").value = "";
+  if(!file) return;
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    const MAX = 1600; /* 壁紙は画面いっぱいに広がるから、顔写真より大きめに */
+    let w = img.width, h = img.height;
+    const scale = Math.min(1, MAX / Math.max(w, h));
+    w = Math.round(w * scale); h = Math.round(h * scale);
+    const cv = document.createElement("canvas");
+    cv.width = w; cv.height = h;
+    const ctx = cv.getContext("2d");
+    ctx.drawImage(img, 0, 0, w, h);
+    URL.revokeObjectURL(url);
+    pendingBg = cv.toDataURL("image/jpeg", 0.85);
+    renderBgField();
+  };
   img.onerror = () => { URL.revokeObjectURL(url); alert("この画像は読み込めなかったみたい…別の画像で試してみて。"); };
   img.src = url;
 });
@@ -4509,6 +4646,8 @@ $("saveProfileBtn").onclick = () => {
   currentRoom.theme = pendingTheme;
   currentRoom.customLamp = pendingCustom.lamp;
   currentRoom.customUser = pendingCustom.user;
+  currentRoom.bgMix = parseInt($("bgMixRange").value, 10);
+  currentRoom.bgBlur = parseInt($("bgBlurRange").value, 10);
   if(pendingModel){ currentRoom.model = pendingModel.id; currentRoom.modelName = pendingModel.name; currentRoom.provider = pendingModel.provider || ""; }
   save(LS_ROOMS, rooms);
 
@@ -4519,6 +4658,15 @@ $("saveProfileBtn").onclick = () => {
     if(!ok) alert("写真の保存領域がいっぱいみたい…他の部屋の写真を減らすか、小さめの画像で試してみて。");
   }
   pendingPhoto = undefined;
+
+  if(pendingBg === null){
+    del(bgKey(currentRoom.id));
+  }else if(typeof pendingBg === "string"){
+    const ok = saveRaw(bgKey(currentRoom.id), pendingBg);
+    if(!ok) alert("壁紙の保存領域がいっぱいみたい…小さめの画像で試してみて。");
+  }
+  pendingBg = undefined;
+  applyRoomBg(currentRoom);
 
   $("roomTitle").textContent = currentRoom.name;
   avatarInto($("headerAvatar"), currentRoom);
@@ -4531,6 +4679,7 @@ $("deleteRoomBtn").onclick = () => {
   if(confirm("「" + currentRoom.name + "」の部屋と会話履歴・写真・記憶の棚・日記帳・あゆみ帳・アルバム帳を消すよ。本当にいい?")){
     delRoomChats(currentRoom);
     del(avatarKey(currentRoom.id));
+    del(bgKey(currentRoom.id));
     del(shelfKey(currentRoom.id));
     del(diaryKey(currentRoom.id));
     del(ayumiKey(currentRoom.id));
@@ -4901,7 +5050,7 @@ $("kozukaiBtn").onclick = () => {
 };
 $("wipeBtn").onclick = async () => {
   if(confirm("全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーを、この端末から全部消すよ。本当にいい?")){
-    for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); del(monoKey(r.id)); del(letterKey(r.id)); }
+    for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(bgKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); del(monoKey(r.id)); del(letterKey(r.id)); }
     del(LS_ROOMS); del(LS_GLOBAL);
     del("oheya_settings_v1"); del("oheya_chat_v1");
     try{ await kvClear(); }catch(e){}
@@ -4935,8 +5084,8 @@ $("exportAllBtn").onclick = exportAllMd;
 /* ---------- バックアップ ---------- */
 async function makeBackup(){
   const data = {
-    app: "oheya", version: 10, exportedAt: Date.now(),
-    rooms, chats: {}, shelves: {}, diaries: {}, ayumis: {}, monos: {}, letters: {}, avatars: {}, albums: [], chatimgs: []
+    app: "oheya", version: 11, exportedAt: Date.now(),
+    rooms, chats: {}, shelves: {}, diaries: {}, ayumis: {}, monos: {}, letters: {}, avatars: {}, bgs: {}, albums: [], chatimgs: []
   };
   for(const r of rooms){
     data.chats[r.id] = {};
@@ -4950,6 +5099,8 @@ async function makeBackup(){
     data.ayumis[r.id] = loadAyumi(r.id);
     const av = loadRaw(avatarKey(r.id));
     if(av) data.avatars[r.id] = av;
+    const bg = loadRaw(bgKey(r.id));
+    if(bg) data.bgs[r.id] = bg;
   }
   try{ data.albums = await albumAll(); }catch(e){ data.albums = []; }
   try{ data.chatimgs = await imgAll(); }catch(e){ data.chatimgs = []; }
@@ -5040,7 +5191,7 @@ $("restoreInput").addEventListener("change", () => {
     const when = obj.exportedAt ? new Date(obj.exportedAt).toLocaleString("ja-JP") : "不明";
     if(!confirm("バックアップ（" + obj.rooms.length + "部屋・" + when + "保存）から復元するよ。\n今この端末にあるデータは置きかわるの。本当にいい?\n（心配なら先に💾で今の状態も保存してね）")) return;
     /* 今のデータを片付けてから復元 */
-    for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); del(monoKey(r.id)); del(letterKey(r.id)); }
+    for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(bgKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); del(monoKey(r.id)); del(letterKey(r.id)); }
     rooms = obj.rooms;
     save(LS_ROOMS, rooms);
     let photoTrouble = false;
@@ -5060,6 +5211,8 @@ $("restoreInput").addEventListener("change", () => {
       save(ayumiKey(r.id), (obj.ayumis && obj.ayumis[r.id]) || { nextId:1, items:[] });
       const av = obj.avatars && obj.avatars[r.id];
       if(av){ if(!saveRaw(avatarKey(r.id), av)) photoTrouble = true; }
+      const bg = obj.bgs && obj.bgs[r.id];
+      if(bg){ if(!saveRaw(bgKey(r.id), bg)) photoTrouble = true; }
     }
     save(LS_ROOMS, rooms); /* 旧形式のthreads消しこみも保存に反映 */
     /* アルバムの復元（古いバックアップにはalbumsがないこともあるよ） */
