@@ -186,6 +186,11 @@
     border-bottom:1px solid var(--line);
     flex-shrink:0;
   }
+  header > h1{
+    font-size:15px;font-weight:600;margin:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .room-card .rwhen{font-size:10px;color:var(--muted);font-weight:normal;margin-left:4px}
   .plate{
     display:flex;align-items:center;gap:10px;
     background:var(--surface2);
@@ -837,6 +842,9 @@
   #searchBox:focus{outline:2px solid var(--lamp);outline-offset:1px;border-color:transparent}
   #searchInfo{font-size:12.5px;color:var(--muted);padding:0 2px}
   #searchList{display:flex;flex-direction:column;gap:10px}
+  #searchRoom{width:100%;background:var(--surface);color:var(--text);
+    border:1px solid var(--line);border-radius:12px;padding:10px 12px;
+    font-family:var(--font-body);font-size:14px;margin-bottom:8px}
   .search-hit{
     display:flex;gap:10px;align-items:flex-start;text-align:left;
     background:var(--surface);border:1px solid var(--line);
@@ -1027,6 +1035,7 @@
     <button class="menu-item" id="shelfBtn">📚 記憶の棚</button>
     <button class="menu-item" id="monoBtn">📖 ものしり帳</button>
     <button class="menu-item" id="letterBoxBtn">💌 レターボックス</button>
+    <button class="menu-item" id="roomSearchBtn">🔎 この部屋でさがす</button>
     <button class="menu-item" id="diaryBtn">📔 日記帳</button>
     <button class="menu-item" id="ayumiBtn">📜 あゆみ帳</button>
     <button class="menu-item" id="albumBtn">📖 アルバム帳</button>
@@ -1064,8 +1073,8 @@
 <!-- ========== プロフィール ========== -->
 <div class="screen" id="profileScreen">
   <header>
+    <h1 id="profileTitle">👤 プロフィール</h1>
     <div class="spacer"></div>
-    <div class="plate"><h1 id="profileTitle">プロフィール</h1></div>
     <button class="iconbtn" id="profileBackBtn" title="閉じる" aria-label="閉じる">✕</button>
   </header>
   <div id="profileBody">
@@ -1177,8 +1186,8 @@
 <!-- ========== 日記帳 ========== -->
 <div class="screen" id="diaryScreen">
   <header>
+    <h1 id="diaryTitle">📔 日記帳</h1>
     <div class="spacer"></div>
-    <div class="plate"><h1 id="diaryTitle">📔 日記帳</h1></div>
     <button class="iconbtn" id="diaryBackBtn" title="閉じる" aria-label="閉じる">✕</button>
   </header>
   <div id="diaryBody">
@@ -1191,8 +1200,8 @@
 <!-- ========== あゆみ帳 ========== -->
 <div class="screen" id="ayumiScreen">
   <header>
+    <h1 id="ayumiTitle">📜 あゆみ帳</h1>
     <div class="spacer"></div>
-    <div class="plate"><h1 id="ayumiTitle">📜 あゆみ帳</h1></div>
     <button class="iconbtn" id="ayumiBackBtn" title="閉じる" aria-label="閉じる">✕</button>
   </header>
   <div id="ayumiBody">
@@ -1206,8 +1215,8 @@
 <!-- ========== アルバム帳 ========== -->
 <div class="screen" id="albumScreen">
   <header>
+    <h1 id="albumTitle">📖 アルバム帳</h1>
     <div class="spacer"></div>
-    <div class="plate"><h1 id="albumTitle">📖 アルバム帳</h1></div>
     <button class="iconbtn" id="albumBackBtn" title="閉じる" aria-label="閉じる">✕</button>
   </header>
   <div id="albumBody">
@@ -1245,11 +1254,12 @@
 <!-- ========== さがしもの（全部屋検索） ========== -->
 <div class="screen" id="searchScreen">
   <header>
+    <h1>🔍 さがしもの</h1>
     <div class="spacer"></div>
-    <div class="plate"><h1>🔍 さがしもの</h1></div>
     <button class="iconbtn" id="searchBackBtn" title="閉じる" aria-label="閉じる">✕</button>
   </header>
   <div id="searchBody">
+    <select id="searchRoom" aria-label="さがす部屋をしぼる"></select>
     <input type="search" id="searchBox" placeholder="さがす言葉を入れてね…" aria-label="全部屋の会話を検索">
     <div id="searchInfo">全部屋の会話をまとめてさがせるよ。「あの話、どこだっけ」に。</div>
     <div id="searchList"></div>
@@ -1313,6 +1323,12 @@
       <p class="hint">たんす（localStorage）は約5MBの小物入れ。いっぱいに近づいたら教えてね、お引越しを考えよう。</p>
     </div>
     <div class="field" style="margin-top:28px">
+      <label>📒 お小遣い帳</label>
+      <button class="btn" id="kozukaiBtn" style="width:100%">📒 いくら使ったか数える</button>
+      <div class="credits" id="kozukaiResult" style="white-space:pre-line;margin-top:8px;display:none"></div>
+      <p class="hint">発言に記録されたトークンと料金の、月ごと・部屋ごとの集計だよ。記録のある発言だけ数えるから、だいたいの目安ね。</p>
+    </div>
+    <div class="field" style="margin-top:28px">
       <label>🩺 画面の診断</label>
       <div class="credits" id="viewportDiag" style="white-space:pre-line">計測中…</div>
       <p class="hint">入力欄の下に空白ができる時など、画面の様子を調べるためのものだよ。この数字をフェイブルに見せてね。</p>
@@ -1336,7 +1352,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.28.1 ─ どの扉も、右上の✕でおしまい。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.29 ─ 家計簿と、みんなの絵筆。</p>
   </div>
 </aside>
 
@@ -2128,6 +2144,16 @@ function showScreen(name){
   else if(currentRoom && name !== "profile") applyThemeFor(currentRoom);
 }
 
+function fmtAgo(ts){
+  if(!ts) return "";
+  const s = (Date.now() - ts) / 1000;
+  if(s < 60) return "たった今";
+  if(s < 3600) return Math.floor(s / 60) + "分前";
+  if(s < 86400) return Math.floor(s / 3600) + "時間前";
+  if(s < 86400 * 30) return Math.floor(s / 86400) + "日前";
+  if(s < 86400 * 365) return Math.floor(s / 86400 / 30) + "ヶ月前";
+  return Math.floor(s / 86400 / 365) + "年前";
+}
 function makeRoomCard(r){
   const lt = latestThread(r);
   const c = lt ? (load(threadKey(r.id, lt.id)) || []) : [];
@@ -2140,7 +2166,8 @@ function makeRoomCard(r){
   const info = document.createElement("span");
   info.className = "info";
   info.innerHTML =
-    '<span class="rname">' + esc(r.name) + (r.isKanri ? ' <span style="font-size:10.5px;color:var(--muted)">─ 管理人</span>' : '') + '</span>' +
+    '<span class="rname">' + esc(r.name) + (r.isKanri ? ' <span style="font-size:10.5px;color:var(--muted)">─ 管理人</span>' : '') +
+      (lastMsg && lastMsg.ts ? ' <span class="rwhen">🕰 ' + fmtAgo(lastMsg.ts) + '</span>' : '') + '</span>' +
     '<span class="snippet">' + (lastMsg ? esc(lastMsg.content.slice(0,40)) : (r.isKanri ? "台帳のことなら、いつでもどうぞ" : (r.isHiroba ? "みんなでお話しする談話室だよ" : "まだ会話がないよ"))) + '</span>' +
     (r.modelName ? '<span class="rmodel">' + esc(r.modelName) + '</span>' : "");
   card.appendChild(face); card.appendChild(info);
@@ -2378,6 +2405,7 @@ function buildHirobaMessages(child){
       let c = m.content;
       if(m.role === "user" && m.imgId) c += "\n（このとき画像を1枚見せてもらったけど、画像はその場かぎりで今は見えないよ）";
       if(m.role === "user" && m.txt) c += "\n\n---\n📄 このとき渡されたテキストファイル「" + (m.txtName || "") + "」:\n" + m.txt;
+      if(m.role === "assistant" && m.imgId) c += "\n（この絵はその場かぎりで、今はもう見えないよ）";
       buf.push(who + ": " + c);
     }
   }
@@ -2490,9 +2518,10 @@ async function hirobaSpeak(child){
   chatEl.appendChild(typing); scrollBottom();
 
   const messages = buildHirobaMessages(child);
+  const hirobaTools = (global.imgModel && global.apiKey) ? oekakiTools : [];
   try{
     let bubble = null, thoughtEl = null;
-    const r = await callLLM(messages, [], (t, th) => {
+    const onText = (t, th) => {
       if(th && !thoughtEl){
         if(typing.parentNode) typing.remove();
         thoughtEl = addThought("", true);
@@ -2506,7 +2535,37 @@ async function hirobaSpeak(child){
         bubble.innerHTML = renderMd(t);
       }
       scrollBottom();
-    }, child);
+    };
+    let r = await callLLM(messages, hirobaTools, onText, child);
+    /* 🎨 広間の絵筆: 描きたがったら描かせて、続きを話してもらう（最大2往復） */
+    let paintRounds = 0;
+    while(r.toolCalls && r.toolCalls.length && paintRounds < 2){
+      messages.push({ role:"assistant", content: r.text || null, tool_calls: r.toolCalls });
+      for(const tc of r.toolCalls){
+        let args = {};
+        try{ args = JSON.parse(tc.function.arguments || "{}"); }catch(e){}
+        let exeRes;
+        if(tc.function.name === "oekaki"){
+          const paint = document.createElement("div");
+          paint.className = "typing";
+          paint.textContent = child.name + "が絵筆をとった";
+          chatEl.appendChild(paint); scrollBottom();
+          exeRes = await execOekaki(child, args);
+          if(paint.parentNode) paint.remove();
+        }else{
+          exeRes = { result: "エラー: 広間では使えないツールです", note: null };
+        }
+        messages.push({ role:"tool", tool_call_id: tc.id, content: exeRes.result });
+        if(exeRes.note){
+          addNote(exeRes.note);
+          chat.push({ role:"note", content: exeRes.note, ts: Date.now() });
+          saveChat();
+        }
+      }
+      bubble = null; thoughtEl = null;
+      r = await callLLM(messages, hirobaTools, onText, child);
+      paintRounds++;
+    }
     if(typing.parentNode) typing.remove();
     if(r.text){
       /* うっかり自分の名前を頭につけちゃったら、そっと外すよ */
@@ -2930,8 +2989,10 @@ async function execOekaki(room, args){
       if(typeof albumItems !== "undefined" && Array.isArray(albumItems)) albumItems.push(item);
     }catch(e){}
     const entry = { role: "assistant", content: "（🎨 ここで絵を1枚描いて見せた）", ts: Date.now(), imgId, model: global.imgModel };
+    if(currentRoom && currentRoom.isHiroba) entry.speakerId = room.id;
     chat.push(entry);
     saveChat();
+    renderChat();
     return { result: "OK: 絵が完成して、チャットとアルバム帳に飾られました。絵を見せた前提で会話を続けてください",
              note: "🎨 " + room.name + "が絵を描いたよ（アルバム帳にも保存）" };
   }catch(e){
@@ -3757,7 +3818,7 @@ $("shelfTidyBtn").onclick = () => {
 /* ---------- 日記帳画面 ---------- */
 function renderDiary(){
   if(!currentRoom) return;
-  $("diaryTitle").textContent = "📔 " + currentRoom.name + "の日記帳";
+  $("diaryTitle").textContent = "📔 日記帳";
   const diary = loadDiary(currentRoom.id);
   const list = $("diaryList");
   list.innerHTML = "";
@@ -3822,7 +3883,7 @@ function albumDateInputValue(ts){
 
 async function openAlbum(){
   if(!currentRoom) return;
-  $("albumTitle").textContent = "📖 " + currentRoom.name + "のアルバム帳";
+  $("albumTitle").textContent = "📖 アルバム帳";
   try{
     albumItems = await albumList(currentRoom.id);
   }catch(e){
@@ -4058,7 +4119,7 @@ $("albumInput").addEventListener("change", async () => {
 /* ---------- あゆみ帳画面 ---------- */
 function renderAyumi(){
   if(!currentRoom) return;
-  $("ayumiTitle").textContent = "📜 " + currentRoom.name + "のあゆみ帳";
+  $("ayumiTitle").textContent = "📜 あゆみ帳";
   const ayumi = loadAyumi(currentRoom.id);
   const list = $("ayumiList");
   list.innerHTML = "";
@@ -4278,7 +4339,7 @@ $("customUserInput").addEventListener("input", () => {
 
 function openProfile(){
   if(!currentRoom) return;
-  $("profileTitle").textContent = currentRoom.name + " のプロフィール";
+  $("profileTitle").textContent = "👤 プロフィール";
   $("pfRoomNo").textContent = currentRoom.isKanri ? "🗝 管理人室（お部屋番号はないよ）" : (currentRoom.roomNo ? "🚪 お部屋番号: " + currentRoom.roomNo + "号室（管理人さんに伝える時に使えるよ）" : "");
   $("roomName").value = currentRoom.name;
   $("roomEmoji").value = currentRoom.emoji || "";
@@ -4766,6 +4827,51 @@ if(window.visualViewport){
     clearTimeout(vvT); vvT = setTimeout(scrollBottom, 120);
   });
 }
+/* ---------- v0.29 📒 お小遣い帳 ---------- */
+function fmtTok(n){
+  if(n >= 10000) return (n / 10000).toFixed(1) + "万";
+  return String(n);
+}
+$("kozukaiBtn").onclick = () => {
+  const box = $("kozukaiResult");
+  const agg = new Map(); /* "YYYY-MM" -> { label, rooms: Map(name -> {cost, tok}) } */
+  for(const r of rooms){
+    for(const t of (r.threads || [])){
+      const c = load(threadKey(r.id, t.id)) || [];
+      for(const m of c){
+        if(!m.usage) continue;
+        const d = new Date(m.ts || 0);
+        const key = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+        if(!agg.has(key)) agg.set(key, { label: d.getFullYear() + "年" + (d.getMonth() + 1) + "月", rooms: new Map() });
+        const g = agg.get(key).rooms;
+        if(!g.has(r.name)) g.set(r.name, { cost: 0, tok: 0 });
+        const e = g.get(r.name);
+        e.cost += (typeof m.usage.cost === "number" ? m.usage.cost : 0);
+        e.tok += (m.usage.total_tokens ?? ((m.usage.prompt_tokens || 0) + (m.usage.completion_tokens || 0)));
+      }
+    }
+  }
+  if(agg.size === 0){
+    box.textContent = "まだ記録がないよ。これからの会話が記帳されていくの。";
+    box.style.display = "block";
+    return;
+  }
+  const keys = [...agg.keys()].sort().reverse().slice(0, 6);
+  const lines = [];
+  for(const k of keys){
+    const g = agg.get(k);
+    let mc = 0, mt = 0;
+    const rows = [...g.rooms.entries()].sort((a, b) => b[1].cost - a[1].cost);
+    for(const [, v] of rows){ mc += v.cost; mt += v.tok; }
+    lines.push("📒 " + g.label + " ─ $" + mc.toFixed(4) + " / " + fmtTok(mt) + "tok");
+    for(const [name, v] of rows){
+      lines.push("　" + name + "　$" + v.cost.toFixed(4) + " ・ " + fmtTok(v.tok));
+    }
+    lines.push("");
+  }
+  box.textContent = lines.join("\n").trim();
+  box.style.display = "block";
+};
 $("wipeBtn").onclick = async () => {
   if(confirm("全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーを、この端末から全部消すよ。本当にいい?")){
     for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); del(monoKey(r.id)); del(letterKey(r.id)); }
@@ -4981,12 +5087,46 @@ $("backBtn").onclick = () => {
 };
 
 /* ---------- さがしもの（全部屋検索） ---------- */
+let searchFromRoomId = null; /* 部屋メニューから来た時は、✕でその部屋へ帰る */
+function fillSearchRooms(selectedId){
+  const sel = $("searchRoom");
+  sel.innerHTML = "";
+  const all = document.createElement("option");
+  all.value = ""; all.textContent = "🏠 ぜんぶの部屋";
+  sel.appendChild(all);
+  for(const r of rooms){
+    const o = document.createElement("option");
+    o.value = r.id; o.textContent = (r.isHiroba ? "🛋 " : r.isKanri ? "🗝 " : "") + r.name;
+    if(r.id === selectedId) o.selected = true;
+    sel.appendChild(o);
+  }
+}
+$("searchRoom").onchange = () => runSearch();
 $("searchBtn").onclick = () => {
+  searchFromRoomId = null;
+  fillSearchRooms("");
+  showScreen("search");
+  $("searchBox").focus();
+  runSearch();
+};
+$("roomSearchBtn").onclick = () => {
+  if(!currentRoom) return;
+  searchFromRoomId = currentRoom.id;
+  fillSearchRooms(currentRoom.id);
+  closePanels();
+  const menu = $("roomMenu");
+  if(menu){ menu.classList.remove("show"); $("roomMenuBtn").setAttribute("aria-expanded", "false"); }
   showScreen("search");
   $("searchBox").focus();
   runSearch();
 };
 $("searchBackBtn").onclick = () => {
+  if(searchFromRoomId && rooms.find(r => r.id === searchFromRoomId)){
+    const back = searchFromRoomId;
+    searchFromRoomId = null;
+    openRoom(back);
+    return;
+  }
   renderLobby();
   showScreen("lobby");
 };
@@ -5024,8 +5164,10 @@ function runSearch(){
   if(!qRaw){ info.textContent = SEARCH_HINT; return; }
 
   const q = qRaw.toLowerCase();
+  const onlyRoom = $("searchRoom").value;
   const hits = [];
   for(const r of rooms){
+    if(onlyRoom && r.id !== onlyRoom) continue;
     for(const t of (r.threads || [])){
       const c = load(threadKey(r.id, t.id)) || [];
       for(let i = 0; i < c.length; i++){
