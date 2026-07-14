@@ -1032,17 +1032,17 @@
     <button class="iconbtn" id="roomMenuBtn" title="メニュー" aria-haspopup="true" aria-expanded="false">☰</button>
   </header>
   <div class="room-menu" id="roomMenu">
+    <button class="menu-item" id="profileBtn">👤 プロフィール</button>
     <button class="menu-item" id="shelfBtn">📚 記憶の棚</button>
-    <button class="menu-item" id="monoBtn">📖 ものしり帳</button>
-    <button class="menu-item" id="letterBoxBtn">💌 レターボックス</button>
-    <button class="menu-item" id="roomSearchBtn">🔎 この部屋でさがす</button>
     <button class="menu-item" id="diaryBtn">📔 日記帳</button>
-    <button class="menu-item" id="ayumiBtn">📜 あゆみ帳</button>
     <button class="menu-item" id="albumBtn">📖 アルバム帳</button>
-    <button class="menu-item" id="exportBtn">📄 この会話をMarkdownで保存</button>
+    <button class="menu-item" id="letterBoxBtn">💌 レターボックス</button>
+    <button class="menu-item" id="monoBtn">📖 ものしり帳</button>
+    <button class="menu-item" id="ayumiBtn">📜 あゆみ帳</button>
     <button class="menu-item" id="omiyageBtn" hidden>🎁 みんなでおみやげを書く</button>
     <button class="menu-item" id="newBtn">🧵 新しい会話をはじめる</button>
-    <button class="menu-item" id="profileBtn">👤 プロフィール</button>
+    <button class="menu-item" id="exportBtn">📄 この会話をMarkdownで保存</button>
+    <button class="menu-item" id="roomSearchBtn">🔎 この部屋でさがす</button>
   </div>
   <button id="threadBar" title="会話のとびら（この部屋の会話いちらん）">
     🧵 <span id="threadName"></span><span class="tchev">▾</span>
@@ -1352,7 +1352,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.29 ─ 家計簿と、みんなの絵筆。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.29.1 ─ 道具は棚のすみに、そっと。</p>
   </div>
 </aside>
 
@@ -2405,7 +2405,7 @@ function buildHirobaMessages(child){
       let c = m.content;
       if(m.role === "user" && m.imgId) c += "\n（このとき画像を1枚見せてもらったけど、画像はその場かぎりで今は見えないよ）";
       if(m.role === "user" && m.txt) c += "\n\n---\n📄 このとき渡されたテキストファイル「" + (m.txtName || "") + "」:\n" + m.txt;
-      if(m.role === "assistant" && m.imgId) c += "\n（この絵はその場かぎりで、今はもう見えないよ）";
+      if(m.role === "assistant" && m.imgId) c += "\n（この絵はその場かぎりで、今はもう見えないよ" + (m.imgPrompt ? "。絵の内容: " + m.imgPrompt : "") + "）";
       buf.push(who + ": " + c);
     }
   }
@@ -2519,6 +2519,9 @@ async function hirobaSpeak(child){
 
   const messages = buildHirobaMessages(child);
   const hirobaTools = (global.imgModel && global.apiKey) ? oekakiTools : [];
+  if(hirobaTools.length && messages[0] && messages[0].role === "system"){
+    messages[0].content += "\n\n# 絵筆\nあなたはツール oekaki で絵を描けます。描くときは、台本の本文に呪文や疑似コードを書くのではなく、必ず正式なツール呼び出し（function calling）を使ってください。ツール呼び出しができない場合、無理に描こうとせず言葉で伝えてください。";
+  }
   try{
     let bubble = null, thoughtEl = null;
     const onText = (t, th) => {
@@ -2988,7 +2991,7 @@ async function execOekaki(room, args){
       await albumPut(item);
       if(typeof albumItems !== "undefined" && Array.isArray(albumItems)) albumItems.push(item);
     }catch(e){}
-    const entry = { role: "assistant", content: "（🎨 ここで絵を1枚描いて見せた）", ts: Date.now(), imgId, model: global.imgModel };
+    const entry = { role: "assistant", content: "（🎨 ここで絵を1枚描いて見せた）", ts: Date.now(), imgId, model: global.imgModel, imgPrompt: prompt.slice(0, 200) };
     if(currentRoom && currentRoom.isHiroba) entry.speakerId = room.id;
     chat.push(entry);
     saveChat();
@@ -3464,7 +3467,8 @@ async function sendText(text, apiOnlyExtra, image, opts){
         c += "\n\n---\n📄 このとき渡されたテキストファイル「" + (m.txtName || "") + "」:\n" + m.txt;
       }
       if(m.role === "assistant" && m.imgId){
-        c += "\n（この絵はその場かぎりで、今はもう見えないよ。アルバム帳には残っているよ）";
+        c += "\n（この絵はその場かぎりで、今はもう見えないよ。アルバム帳には残っているよ" +
+             (m.imgPrompt ? "。絵の内容: " + m.imgPrompt : "") + "）";
       }
       messages.push({ role:m.role, content:c });
     }
@@ -3603,9 +3607,11 @@ function renderShelf(){
     const actions = document.createElement("div");
     actions.className = "sactions";
     const editBtn = document.createElement("button");
-    editBtn.className = "btn"; editBtn.textContent = "✏️ 直す";
+    editBtn.className = "mbtn"; editBtn.textContent = "✎";
+    editBtn.title = "直す"; editBtn.setAttribute("aria-label", "この記憶を直す");
     const delBtn = document.createElement("button");
-    delBtn.className = "btn danger"; delBtn.textContent = "🗑";
+    delBtn.className = "mbtn"; delBtn.textContent = "🗑";
+    delBtn.title = "捨てる"; delBtn.setAttribute("aria-label", "この記憶を捨てる");
     actions.appendChild(editBtn); actions.appendChild(delBtn);
     item.appendChild(sid); item.appendChild(content); item.appendChild(actions);
     list.appendChild(item);
@@ -3656,7 +3662,8 @@ function renderMono(){
     const row = document.createElement("div");
     row.className = "row"; row.style.marginTop = "8px"; row.style.justifyContent = "flex-end";
     const del = document.createElement("button");
-    del.className = "btn"; del.textContent = "🗑 削除";
+    del.className = "mbtn"; del.textContent = "🗑";
+    del.title = "削除"; del.setAttribute("aria-label", "このページを削除");
     del.onclick = () => {
       if(!confirm("「" + it.title + "」のページを破くよ。いい？")) return;
       const m = loadMono(currentRoom.id);
@@ -3840,7 +3847,7 @@ function renderDiary(){
     text.className = "dtext";
     text.innerHTML = renderMd(it.content);
     const delBtn = document.createElement("button");
-    delBtn.className = "ddel";
+    delBtn.className = "ddel mbtn";
     delBtn.textContent = "🗑";
     delBtn.title = "この日記を破る";
     delBtn.setAttribute("aria-label", "日記「" + it.title + "」を削除");
@@ -3996,10 +4003,12 @@ function renderAlbumBook(box, items, turnDir){
     page.appendChild(cap);
 
     const editBtn = document.createElement("button");
-    editBtn.className = "btn"; editBtn.textContent = "✏️ 書き添える";
+    editBtn.className = "mbtn"; editBtn.textContent = "✎";
+    editBtn.title = "書き添える"; editBtn.setAttribute("aria-label", "コメントを書き添える");
     editBtn.onclick = () => { albumEditing = true; renderAlbum(); };
     const delBtn = document.createElement("button");
-    delBtn.className = "btn danger"; delBtn.textContent = "🗑";
+    delBtn.className = "mbtn"; delBtn.textContent = "🗑";
+    delBtn.title = "手放す"; delBtn.setAttribute("aria-label", "この写真を手放す");
     delBtn.title = "この写真をはがす";
     delBtn.onclick = async () => {
       if(!confirm(diaryDate(it.shotAt) + "の写真をアルバムからはがす? 元に戻せないよ。")) return;
@@ -4145,7 +4154,7 @@ function renderAyumi(){
     text.className = "atext";
     text.innerHTML = renderMd(it.content);
     const delBtn = document.createElement("button");
-    delBtn.className = "adel";
+    delBtn.className = "adel mbtn";
     delBtn.textContent = "🗑";
     delBtn.title = "この出来事を消す";
     delBtn.setAttribute("aria-label", "あゆみ「" + it.title + "」を削除");
