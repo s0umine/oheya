@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
 <title>おへや v0.20.1</title>
 <meta name="theme-color" content="#2B2735">
 <meta name="mobile-web-app-capable" content="yes">
@@ -429,6 +429,14 @@
     max-width:min(100%,260px);border-radius:10px;display:block;
     margin-bottom:6px;background:rgba(0,0,0,.2);
   }
+  /* ---------- v0.23 ものしり帳 ---------- */
+  .mono-item{background:var(--surface);border:1px solid var(--line);
+    border-radius:12px;padding:10px 12px;margin-bottom:10px}
+  .mono-item summary{cursor:pointer;font-size:14px;word-break:break-word}
+  .mono-item input[type=text], .mono-item textarea{
+    width:100%;background:var(--surface2);color:var(--text);
+    border:1px solid var(--line);border-radius:10px;padding:8px 10px;
+    font-family:var(--font-body);font-size:14px;margin-top:8px;resize:vertical}
   /* ---------- v0.21 発言まわりの小物 ---------- */
   .ahead{display:flex;align-items:center;gap:8px}
   .ahead .avatar{width:30px;height:30px;font-size:16px}
@@ -964,6 +972,7 @@
   </header>
   <div class="room-menu" id="roomMenu">
     <button class="menu-item" id="shelfBtn">📚 記憶の棚</button>
+    <button class="menu-item" id="monoBtn">📖 ものしり帳</button>
     <button class="menu-item" id="diaryBtn">📔 日記帳</button>
     <button class="menu-item" id="ayumiBtn">📜 あゆみ帳</button>
     <button class="menu-item" id="albumBtn">📖 アルバム帳</button>
@@ -1258,7 +1267,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.22.1 ─ 空白地帯に、さよならを。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.23 ─ 必要なときだけ、ページをめくる。</p>
   </div>
 </aside>
 
@@ -1272,6 +1281,21 @@
     <button class="btn primary" id="threadNewBtn" style="width:100%">＋ 新しい会話をはじめる</button>
     <div id="threadList" style="margin-top:14px"></div>
     <p class="hint" style="margin-top:14px">この部屋の会話のとびら。話題ごとに分けても、記憶の棚や日記帳はこの子のものだから、どのとびらの中でもちゃんと覚えているよ。</p>
+  </div>
+</aside>
+
+<!-- ========== ものしり帳 ========== -->
+<aside class="panel" id="monoPanel" aria-label="ものしり帳">
+  <div class="panel-head">
+    <h2>📖 ものしり帳</h2>
+    <button class="iconbtn" data-close aria-label="閉じる">✕</button>
+  </div>
+  <div class="panel-body">
+    <p class="hint" style="margin-bottom:14px">
+      この子のための参考資料置き場だよ。設定資料や呪文集など、好きなページを置いておくと、この子は必要な時だけ自分でページを開いて読むよ（ふだんは目次だけ渡すから、トークンを食べすぎない）。
+    </p>
+    <div id="monoList"></div>
+    <button class="btn" id="monoAddBtn" style="width:100%">＋ 新しいページを書く</button>
   </div>
 </aside>
 
@@ -1520,6 +1544,11 @@ function applyThemeFor(room){ applyColors(themeColorsFor(room)); }
 /* ---------- 記憶の棚データ ---------- */
 function loadShelf(roomId){ return load(shelfKey(roomId)) || { nextId: 1, items: [] }; }
 function saveShelf(roomId, shelf){ return save(shelfKey(roomId), shelf); }
+
+/* ---------- ものしり帳データ（部屋ごとの参考資料） ---------- */
+function monoKey(roomId){ return "oheya_mono_" + roomId; }
+function loadMono(roomId){ return load(monoKey(roomId)) || { nextId: 1, items: [] }; }
+function saveMono(roomId, mono){ return save(monoKey(roomId), mono); }
 
 /* ---------- あゆみ帳データ ---------- */
 function loadAyumi(roomId){ return load(ayumiKey(roomId)) || { nextId: 1, items: [] }; }
@@ -2423,6 +2452,7 @@ function openRoom(id, threadId){
   showScreen("room");
   renderSpeakerBar();
   $("omiyageBtn").hidden = !currentRoom.isHiroba;
+  $("monoBtn").hidden = !!currentRoom.isHiroba;
   if(currentRoom.isHiroba){
     if(!currentThread.members) openHirobaPicker();
   }else if(!currentRoom.model){
@@ -2472,6 +2502,17 @@ function buildSystem(room){
     sys += "\n\n# ユーザーについて\n";
     if(room.userName) sys += "- ユーザーのことは「" + room.userName + "」と呼んでください。\n";
     if(room.userNote) sys += room.userNote + "\n";
+  }
+  {
+    const mono = loadMono(room.id);
+    if(mono.items.length){
+      sys += "\n\n# ものしり帳（参考資料）\n";
+      sys += "ユーザーがあなたのために用意した参考資料集です。必要な時だけ、ツール monoshiri_read でページを開いて読めます（番号で指定）。ふだんは目次だけが渡されます。\n";
+      sys += "\n目次:\n";
+      for(const it of mono.items){
+        sys += "[" + it.id + "] " + it.title + "\n";
+      }
+    }
   }
   if(room.memoryEnabled){
     const shelf = loadShelf(room.id);
@@ -2556,6 +2597,22 @@ function buildSystem(room){
 }
 
 /* ---------- ツール定義と実行 ---------- */
+const monoTools = [
+  {
+    type: "function",
+    function: {
+      name: "monoshiri_read",
+      description: "ものしり帳のページを開いて内容を読む。idは目次に表示されている番号。",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "integer", description: "読みたいページの番号" }
+        },
+        required: ["id"]
+      }
+    }
+  }
+];
 const memoryTools = [
   {
     type: "function",
@@ -2702,6 +2759,7 @@ const kanriTools = [
 
 function buildTools(room){
   const tools = [];
+  if(!room.isHiroba && loadMono(room.id).items.length) tools.push(...monoTools);
   if(room.memoryEnabled) tools.push(...memoryTools);
   if(room.diaryEnabled) tools.push(...diaryTools);
   if(room.ayumiEnabled) tools.push(...ayumiTools);
@@ -2713,6 +2771,13 @@ function execTool(room, name, args){
   const normText = s => String(s).replace(/\\n/g, "\n");
   const shelf = loadShelf(room.id);
   let result, note;
+  if(name === "monoshiri_read"){
+    const mono = loadMono(room.id);
+    const it = mono.items.find(i => i.id === parseInt(args.id));
+    if(!it) return { result: "エラー: ページ[" + args.id + "]は見つかりません", note: null };
+    return { result: "📖 " + it.title + "\n\n" + it.content,
+             note: "📖 " + room.name + "がものしり帳「" + it.title + "」を開いたよ" };
+  }
   if(name === "kioku_add"){
     if(!args.content) return { result:"エラー: contentがありません", note:null };
     const id = shelf.nextId++;
@@ -3323,6 +3388,58 @@ function renderShelf(){
   }
 }
 $("shelfBtn").onclick = () => { renderShelf(); openPanel($("shelfPanel")); };
+/* ---------- v0.23 ものしり帳パネル ---------- */
+function renderMono(){
+  const box = $("monoList");
+  box.innerHTML = "";
+  if(!currentRoom) return;
+  const mono = loadMono(currentRoom.id);
+  if(mono.items.length === 0){
+    box.innerHTML = '<p class="hint" style="margin-bottom:10px">まだページがないよ。</p>';
+    return;
+  }
+  for(const it of mono.items){
+    const d = document.createElement("details");
+    d.className = "mono-item";
+    const sum = document.createElement("summary");
+    sum.textContent = "📄 [" + it.id + "] " + it.title;
+    const ti = document.createElement("input");
+    ti.type = "text"; ti.value = it.title; ti.placeholder = "ページの名前";
+    const ta = document.createElement("textarea");
+    ta.value = it.content; ta.rows = 8; ta.placeholder = "ページの中身";
+    const row = document.createElement("div");
+    row.className = "row"; row.style.marginTop = "8px"; row.style.justifyContent = "flex-end";
+    const del = document.createElement("button");
+    del.className = "btn"; del.textContent = "🗑 削除";
+    del.onclick = () => {
+      if(!confirm("「" + it.title + "」のページを破くよ。いい？")) return;
+      const m = loadMono(currentRoom.id);
+      m.items = m.items.filter(x => x.id !== it.id);
+      saveMono(currentRoom.id, m);
+      renderMono();
+    };
+    const sv = document.createElement("button");
+    sv.className = "btn primary"; sv.textContent = "保存";
+    sv.onclick = () => {
+      const m = loadMono(currentRoom.id);
+      const x = m.items.find(y => y.id === it.id);
+      if(x){ x.title = ti.value.trim() || "名無しのページ"; x.content = ta.value; x.ts = Date.now(); }
+      saveMono(currentRoom.id, m);
+      renderMono();
+    };
+    row.appendChild(del); row.appendChild(sv);
+    d.appendChild(sum); d.appendChild(ti); d.appendChild(ta); d.appendChild(row);
+    box.appendChild(d);
+  }
+}
+$("monoAddBtn").onclick = () => {
+  if(!currentRoom) return;
+  const m = loadMono(currentRoom.id);
+  m.items.push({ id: m.nextId++, title: "新しいページ", content: "", ts: Date.now() });
+  saveMono(currentRoom.id, m);
+  renderMono();
+};
+$("monoBtn").onclick = () => { renderMono(); openPanel($("monoPanel")); };
 $("shelfAddBtn").onclick = () => {
   const content = prompt("棚に書き足す内容は?");
   if(!content || !content.trim()) return;
@@ -4046,6 +4163,7 @@ $("deleteRoomBtn").onclick = () => {
     del(shelfKey(currentRoom.id));
     del(diaryKey(currentRoom.id));
     del(ayumiKey(currentRoom.id));
+    del(monoKey(currentRoom.id));
     albumDeleteRoom(currentRoom.id).catch(()=>{});
     imgDeleteRoom(currentRoom.id).catch(()=>{});
     rooms = rooms.filter(r => r.id !== currentRoom.id);
@@ -4220,6 +4338,16 @@ $("lhRange").oninput = () => {
   save(LS_GLOBAL, global); applyTextPrefs(); renderTextPrefs();
 };
 applyTextPrefs();
+/* ---------- v0.23 起動時に画面のずれをリセット（PWAは前回の表示状態を復元してくるの） ---------- */
+(function resetViewportDrift(){
+  let n = 0;
+  const t = setInterval(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    if(++n >= 8) clearInterval(t);
+  }, 150);
+})();
 /* ---------- v0.21.1 キーボードで入力欄が隠れないように ---------- */
 if(window.visualViewport){
   const vv = window.visualViewport;
@@ -4244,7 +4372,7 @@ if(window.visualViewport){
 }
 $("wipeBtn").onclick = async () => {
   if(confirm("全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーを、この端末から全部消すよ。本当にいい?")){
-    for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); }
+    for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); del(monoKey(r.id)); }
     del(LS_ROOMS); del(LS_GLOBAL);
     del("oheya_settings_v1"); del("oheya_chat_v1");
     try{ await kvClear(); }catch(e){}
@@ -4279,7 +4407,7 @@ $("exportAllBtn").onclick = exportAllMd;
 async function makeBackup(){
   const data = {
     app: "oheya", version: 10, exportedAt: Date.now(),
-    rooms, chats: {}, shelves: {}, diaries: {}, ayumis: {}, avatars: {}, albums: [], chatimgs: []
+    rooms, chats: {}, shelves: {}, diaries: {}, ayumis: {}, monos: {}, avatars: {}, albums: [], chatimgs: []
   };
   for(const r of rooms){
     data.chats[r.id] = {};
@@ -4287,6 +4415,7 @@ async function makeBackup(){
       data.chats[r.id][t.id] = load(threadKey(r.id, t.id)) || [];
     }
     data.shelves[r.id] = loadShelf(r.id);
+    data.monos[r.id] = loadMono(r.id);
     data.diaries[r.id] = loadDiary(r.id);
     data.ayumis[r.id] = loadAyumi(r.id);
     const av = loadRaw(avatarKey(r.id));
@@ -4381,7 +4510,7 @@ $("restoreInput").addEventListener("change", () => {
     const when = obj.exportedAt ? new Date(obj.exportedAt).toLocaleString("ja-JP") : "不明";
     if(!confirm("バックアップ（" + obj.rooms.length + "部屋・" + when + "保存）から復元するよ。\n今この端末にあるデータは置きかわるの。本当にいい?\n（心配なら先に💾で今の状態も保存してね）")) return;
     /* 今のデータを片付けてから復元 */
-    for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); }
+    for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); del(monoKey(r.id)); }
     rooms = obj.rooms;
     save(LS_ROOMS, rooms);
     let photoTrouble = false;
@@ -4395,6 +4524,7 @@ $("restoreInput").addEventListener("change", () => {
         for(const tid of Object.keys(rc)) save(threadKey(r.id, tid), rc[tid] || []);
       }
       save(shelfKey(r.id), (obj.shelves && obj.shelves[r.id]) || { nextId:1, items:[] });
+      save(monoKey(r.id), (obj.monos && obj.monos[r.id]) || { nextId:1, items:[] });
       save(diaryKey(r.id), (obj.diaries && obj.diaries[r.id]) || { nextId:1, items:[] });
       save(ayumiKey(r.id), (obj.ayumis && obj.ayumis[r.id]) || { nextId:1, items:[] });
       const av = obj.avatars && obj.avatars[r.id];
