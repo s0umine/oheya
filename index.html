@@ -584,10 +584,13 @@
   html[data-skin="fumi"] #roomScreen.hiroba-room .ahead .avatar{display:none}
   html[data-skin="fumi"] #roomScreen.hiroba-room .ahead .sname{font-size:13px;color:var(--text)}
   html[data-skin="fumi"] #roomScreen.hiroba-room .ahead .sname::after{content:"──";color:var(--muted)}
-  html[data-skin="fumi"] .meta{
-    align-self:flex-end;padding-left:0;padding-right:4px;
-    margin-top:-6px;opacity:.65;
+  /* 思考つきの発言は、思考側の「〇〇──」が名乗りを兼ねるので回答側は名無しに */
+  html[data-skin="fumi"] #roomScreen.hiroba-room .thought + .arow .ahead{display:none}
+  html[data-skin="fumi"] .amline{
+    justify-content:flex-end;padding-left:0;padding-right:4px;
+    opacity:.65;
   }
+  html[data-skin="fumi"] .meta{align-self:flex-end;padding-left:0;padding-right:4px;opacity:.65}
   html[data-skin="fumi"] .umline{opacity:.65}
   html[data-skin="fumi"] .thought{margin:2px 0 4px}
   html[data-skin="fumi"] .thought details{
@@ -595,7 +598,7 @@
   }
   html[data-skin="fumi"] .thought summary{display:none}
   html[data-skin="fumi"] .thought::before{
-    content:attr(data-name) "はこう思案した——";
+    content:attr(data-name) "──";
     display:block;color:var(--text);
     font-size:calc(var(--msgfs,15px) - 1px);
   }
@@ -1595,7 +1598,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.33.1 ─ 記録は、その場でしまう。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.34 ─ 記録は、その場でしまう。</p>
   </div>
 </aside>
 
