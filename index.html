@@ -483,6 +483,84 @@
   .bg-sliders input[type=range]{flex:1;min-width:0}
   .bg-sliders .bg-val{min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
 
+  /* ---------- v0.31 👗 よそおい（スキン） ---------- */
+  .world-card .wdesc{font-size:11px;color:var(--muted)}
+
+  /* --- しるし：ことばを減らした静かな部屋 --- */
+  html[data-skin="shirushi"] p.hint{display:none}
+  html[data-skin="shirushi"] .btn{
+    background:transparent;color:var(--muted);
+    border:1px solid var(--line);
+    font-weight:400;font-family:var(--font-body);
+  }
+  html[data-skin="shirushi"] .btn:hover{background:transparent;border-color:var(--lamp);color:var(--text)}
+  html[data-skin="shirushi"] .btn.primary{background:transparent;border:1px solid var(--lamp);color:var(--lamp)}
+  html[data-skin="shirushi"] .btn.danger{border-color:var(--danger);color:var(--danger)}
+  html[data-skin="shirushi"] #send{
+    background:transparent;color:var(--lamp);
+    border:1px solid var(--lamp);border-radius:12px;
+    font-weight:400;padding:0 16px;
+  }
+  html[data-skin="shirushi"] #send:hover{filter:none;background:var(--lamp-soft)}
+  html[data-skin="shirushi"] #addRoomBtn{
+    background:transparent;color:var(--lamp);
+    border:1px solid var(--lamp);box-shadow:none;
+    font-weight:400;padding:12px 18px;
+  }
+  html[data-skin="shirushi"] .section-title{letter-spacing:.25em}
+  /* きせかえ・よそおい選択を、記号の並びに */
+  html[data-skin="shirushi"] .world-grid{display:flex;flex-wrap:wrap;gap:10px}
+  html[data-skin="shirushi"] .world-card{
+    width:46px;height:46px;border-radius:50%;padding:0;
+    align-items:center;justify-content:center;gap:0;
+  }
+  html[data-skin="shirushi"] .world-card .wname{font-size:0;line-height:0}
+  html[data-skin="shirushi"] .world-card .wname .wemoji{font-size:19px;line-height:1}
+  html[data-skin="shirushi"] .world-card .wsw,
+  html[data-skin="shirushi"] .world-card .wdesc{display:none}
+
+  /* --- まどわく：レトロゲームの会話ウィンドウ --- */
+  html[data-skin="madowaku"]{
+    --font-display:"DotGothic16",monospace;
+    --font-body:"DotGothic16","Zen Kaku Gothic New",sans-serif;
+  }
+  html[data-skin="madowaku"] .msg.assistant,
+  html[data-skin="madowaku"] #roomScreen.has-bg .msg.assistant{
+    background:rgba(13,16,38,.86);color:#F4F4EA;
+    border:2px solid #F4F4EA;outline:2px solid rgba(13,16,38,.86);
+    border-radius:6px;box-shadow:none;padding:13px 15px;
+    -webkit-backdrop-filter:blur(3px);
+    backdrop-filter:blur(3px);
+  }
+  html[data-skin="madowaku"] .msg.assistant a{color:#9FD1FF}
+  html[data-skin="madowaku"] .msg.assistant::after{
+    content:"\25BC";display:block;text-align:right;
+    font-size:10px;line-height:1;margin-top:8px;color:#F4F4EA;opacity:.55;
+    animation:mdkblink 1.1s steps(2,end) infinite;
+  }
+  @keyframes mdkblink{50%{opacity:.08}}
+  @media(prefers-reduced-motion:reduce){
+    html[data-skin="madowaku"] .msg.assistant::after{animation:none}
+  }
+  html[data-skin="madowaku"] .msg.user,
+  html[data-skin="madowaku"] #roomScreen.has-bg .msg.user{
+    background:rgba(13,16,38,.86);color:#F4F4EA;
+    border:2px solid var(--lamp);outline:2px solid rgba(13,16,38,.86);
+    border-radius:6px;
+    -webkit-backdrop-filter:blur(3px);
+    backdrop-filter:blur(3px);
+  }
+  html[data-skin="madowaku"] .ahead .sname{
+    background:rgba(13,16,38,.86);color:#F4F4EA;
+    border:1px solid #F4F4EA;border-radius:4px;padding:2px 8px;
+  }
+  html[data-skin="madowaku"] .thought details{border:2px dashed var(--line);border-radius:6px}
+  html[data-skin="madowaku"] .btn{border-width:2px;border-radius:6px}
+  html[data-skin="madowaku"] .btn.primary{border:none}
+  html[data-skin="madowaku"] #send{border-radius:6px}
+  html[data-skin="madowaku"] #attachBtn{border-width:2px;border-radius:6px}
+  html[data-skin="madowaku"] .room-card{border-width:2px;border-radius:6px}
+
   /* ---------- v0.27 レターボックス ---------- */
   .letter-card{
     position:relative;background:var(--surface);
@@ -1370,6 +1448,11 @@
       <p class="hint">おへや全体の世界観が変わるよ。各部屋の「お部屋のあかり」はそのまま生きるから、組み合わせも楽しんでね。</p>
     </div>
     <div class="field" style="margin-top:28px">
+      <label>👗 よそおい（スキン）</label>
+      <div class="world-grid" id="skinGrid"></div>
+      <p class="hint">色じゃなくて、おへやの「形」ががらっと変わるよ。きせかえや部屋の壁紙と自由に組み合わせられるの。</p>
+    </div>
+    <div class="field" style="margin-top:28px">
       <label>🔤 チャットの文字</label>
       <div class="row" style="align-items:center;gap:10px">
         <span class="hint" style="flex:0 0 5.5em">文字サイズ</span>
@@ -1418,7 +1501,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.30 ─ 記録は、その場でしまう。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.31 ─ 記録は、その場でしまう。</p>
   </div>
 </aside>
 
@@ -1667,7 +1750,7 @@ function renderWorldGrid(){
     const b = document.createElement("button");
     b.type = "button";
     b.className = "world-card" + (t.key === cur ? " on" : "");
-    b.innerHTML = '<span class="wname">' + t.emoji + " " + t.name + '</span>' +
+    b.innerHTML = '<span class="wname"><span class="wemoji">' + t.emoji + '</span> ' + t.name + '</span>' +
       '<span class="wsw">' + t.sw.map(c => '<i style="background:' + c + '"></i>').join("") + '</span>';
     b.onclick = () => {
       global.worldTheme = t.key;
@@ -1679,6 +1762,42 @@ function renderWorldGrid(){
   }
 }
 applyWorldTheme(global.worldTheme || "default");
+
+/* ---------- v0.31 👗 よそおい（スキン） ---------- */
+const SKINS = [
+  { key:"default",  name:"いつもの",   emoji:"\u{1F6AA}", desc:"見慣れたおへや" },
+  { key:"shirushi", name:"しるし",     emoji:"\u25CC",    desc:"ことばを減らした静かな部屋" },
+  { key:"madowaku", name:"まどわく",   emoji:"\u25BC",    desc:"レトロゲームの会話ウィンドウ" }
+];
+function applySkin(key){
+  const k = SKINS.some(s => s.key === key) ? key : "default";
+  if(k === "default") document.documentElement.removeAttribute("data-skin");
+  else document.documentElement.dataset.skin = k;
+  /* しるし：ボタンのことばも記号に */
+  $("send").textContent = (k === "shirushi") ? "\u2191" : "送る";
+  $("addRoomBtn").textContent = (k === "shirushi") ? "\uFF0B" : "\uFF0B 新しい部屋";
+}
+function renderSkinGrid(){
+  const grid = $("skinGrid");
+  if(!grid) return;
+  grid.innerHTML = "";
+  const cur = global.skin || "default";
+  for(const s of SKINS){
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "world-card" + (s.key === cur ? " on" : "");
+    b.innerHTML = '<span class="wname"><span class="wemoji">' + s.emoji + '</span> ' + s.name + '</span>' +
+      '<span class="wdesc">' + s.desc + '</span>';
+    b.onclick = () => {
+      global.skin = s.key;
+      save(LS_GLOBAL, global);
+      applySkin(s.key);
+      renderSkinGrid();
+    };
+    grid.appendChild(b);
+  }
+}
+applySkin(global.skin || "default");
 
 /* ---------- お部屋のあかり（テーマ） ---------- */
 const THEMES = [
@@ -4825,6 +4944,7 @@ $("globalSettingsBtn").onclick = () => {
   renderViewportDiag();
   renderBackupHint();
   renderWorldGrid();
+  renderSkinGrid();
   renderStorageMeter();
   openPanel($("globalPanel"));
 };
