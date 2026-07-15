@@ -567,6 +567,8 @@
     --font-body:"Shippori Mincho","Zen Kaku Gothic New",serif;
   }
   html[data-skin="fumi"] .msg{line-height:2.1}
+  html[data-skin="fumi"] .arow{max-width:100%;width:100%}
+  html[data-skin="fumi"] .thought{max-width:100%}
   html[data-skin="fumi"] .msg.assistant{
     background:transparent;color:var(--text);
     border-radius:0;box-shadow:none;padding:2px 4px 14px;
@@ -577,6 +579,11 @@
     border-radius:0;padding:2px 4px 14px;
   }
   html[data-skin="fumi"] .ahead{display:none}
+  /* 広間だけは、だれの言葉か分かるように名前──を残す */
+  html[data-skin="fumi"] #roomScreen.hiroba-room .ahead{display:flex}
+  html[data-skin="fumi"] #roomScreen.hiroba-room .ahead .avatar{display:none}
+  html[data-skin="fumi"] #roomScreen.hiroba-room .ahead .sname{font-size:13px;color:var(--text)}
+  html[data-skin="fumi"] #roomScreen.hiroba-room .ahead .sname::after{content:"──";color:var(--muted)}
   html[data-skin="fumi"] .meta{
     align-self:flex-end;padding-left:0;padding-right:4px;
     margin-top:-6px;opacity:.65;
@@ -1588,7 +1595,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.33 ─ 記録は、その場でしまう。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.33.1 ─ 記録は、その場でしまう。</p>
   </div>
 </aside>
 
@@ -2919,6 +2926,7 @@ function openRoom(id, threadId){
   $("roomTitle").textContent = currentRoom.name;
   $("threadName").textContent = t.title;
   avatarInto($("headerAvatar"), currentRoom);
+  $("roomScreen").classList.toggle("hiroba-room", !!currentRoom.isHiroba);
   applyRoomBg(currentRoom);
   renderChat();
   showScreen("room");
