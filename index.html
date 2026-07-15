@@ -1773,9 +1773,11 @@ function applySkin(key){
   const k = SKINS.some(s => s.key === key) ? key : "default";
   if(k === "default") document.documentElement.removeAttribute("data-skin");
   else document.documentElement.dataset.skin = k;
-  /* しるし：ボタンのことばも記号に */
-  $("send").textContent = (k === "shirushi") ? "\u2191" : "送る";
-  $("addRoomBtn").textContent = (k === "shirushi") ? "\uFF0B" : "\uFF0B 新しい部屋";
+  /* しるし：ボタンのことばも記号に（起動時にも呼ぶので $ は使わない） */
+  const send = document.getElementById("send");
+  if(send) send.textContent = (k === "shirushi") ? "\u2191" : "送る";
+  const add = document.getElementById("addRoomBtn");
+  if(add) add.textContent = (k === "shirushi") ? "\uFF0B" : "\uFF0B 新しい部屋";
 }
 function renderSkinGrid(){
   const grid = $("skinGrid");
