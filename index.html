@@ -561,6 +561,75 @@
   html[data-skin="madowaku"] #attachBtn{border-width:2px;border-radius:6px}
   html[data-skin="madowaku"] .room-card{border-width:2px;border-radius:6px}
 
+  /* --- ふみ：文庫本のページをめくるように --- */
+  html[data-skin="fumi"]{
+    --font-display:"Shippori Mincho",serif;
+    --font-body:"Shippori Mincho","Zen Kaku Gothic New",serif;
+  }
+  html[data-skin="fumi"] .msg{line-height:2.1}
+  html[data-skin="fumi"] .msg.assistant{
+    background:transparent;color:var(--text);
+    border-radius:0;box-shadow:none;padding:2px 4px 14px;
+  }
+  html[data-skin="fumi"] .msg.user{
+    background:transparent;color:var(--text);
+    border-radius:0;padding:2px 12px 14px 4px;
+    border-right:2px solid var(--lamp);
+  }
+  html[data-skin="fumi"] .ahead .avatar{display:none}
+  html[data-skin="fumi"] .ahead .sname{font-size:13px;color:var(--text)}
+  html[data-skin="fumi"] .ahead .sname::after{content:" \u2500\u2500";color:var(--muted)}
+  html[data-skin="fumi"] #roomScreen.has-bg .msg.assistant,
+  html[data-skin="fumi"] #roomScreen.has-bg .msg.user{
+    background:var(--bg);
+    background:color-mix(in srgb, var(--bg) 76%, transparent);
+    -webkit-backdrop-filter:blur(var(--bgblur,10px));
+    backdrop-filter:blur(var(--bgblur,10px));
+    border-radius:4px;
+  }
+
+  /* --- たんまつ：コマンドラインの部屋 --- */
+  html[data-skin="tanmatsu"]{
+    --font-display:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Courier New",monospace;
+    --font-body:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Courier New",monospace;
+  }
+  html[data-skin="tanmatsu"] .msg{font-size:calc(var(--msgfs,15px) - 1px)}
+  html[data-skin="tanmatsu"] .msg.assistant{
+    background:transparent;color:var(--text);
+    border-radius:0;box-shadow:none;padding:2px 0 12px;
+  }
+  html[data-skin="tanmatsu"] .msg.user{
+    align-self:flex-start;max-width:100%;
+    background:transparent;color:var(--text);
+    border-radius:0;padding:2px 0 12px;
+  }
+  html[data-skin="tanmatsu"] .msg.user::before{content:"> ";color:var(--lamp);font-weight:700}
+  html[data-skin="tanmatsu"] .umline{align-self:flex-start;padding-right:0;padding-left:4px}
+  html[data-skin="tanmatsu"] .ahead .avatar{display:none}
+  html[data-skin="tanmatsu"] .ahead .sname{color:var(--lamp);font-size:12px}
+  html[data-skin="tanmatsu"] .ahead .sname::after{content:"@oheya:~"}
+  html[data-skin="tanmatsu"] #input{caret-color:var(--lamp)}
+  html[data-skin="tanmatsu"] .btn,
+  html[data-skin="tanmatsu"] #send,
+  html[data-skin="tanmatsu"] #attachBtn,
+  html[data-skin="tanmatsu"] #addRoomBtn,
+  html[data-skin="tanmatsu"] #input,
+  html[data-skin="tanmatsu"] input,
+  html[data-skin="tanmatsu"] textarea,
+  html[data-skin="tanmatsu"] select,
+  html[data-skin="tanmatsu"] .room-card,
+  html[data-skin="tanmatsu"] .world-card,
+  html[data-skin="tanmatsu"] .thought details,
+  html[data-skin="tanmatsu"] .bg-preview,
+  html[data-skin="tanmatsu"] .note{border-radius:0}
+  html[data-skin="tanmatsu"] #roomScreen.has-bg .msg.assistant,
+  html[data-skin="tanmatsu"] #roomScreen.has-bg .msg.user{
+    background:var(--bg);
+    background:color-mix(in srgb, var(--bg) 76%, transparent);
+    -webkit-backdrop-filter:blur(var(--bgblur,10px));
+    backdrop-filter:blur(var(--bgblur,10px));
+  }
+
   /* ---------- v0.27 レターボックス ---------- */
   .letter-card{
     position:relative;background:var(--surface);
@@ -1501,7 +1570,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.31 ─ 記録は、その場でしまう。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.32 ─ 記録は、その場でしまう。</p>
   </div>
 </aside>
 
@@ -1767,7 +1836,9 @@ applyWorldTheme(global.worldTheme || "default");
 const SKINS = [
   { key:"default",  name:"いつもの",   emoji:"\u{1F6AA}", desc:"見慣れたおへや" },
   { key:"shirushi", name:"しるし",     emoji:"\u25CC",    desc:"ことばを減らした静かな部屋" },
-  { key:"madowaku", name:"まどわく",   emoji:"\u25BC",    desc:"レトロゲームの会話ウィンドウ" }
+  { key:"fumi",     name:"ふみ",       emoji:"\u{1F4D6}", desc:"文庫本のページをめくるように" },
+  { key:"madowaku", name:"まどわく",   emoji:"\u25BC",    desc:"レトロゲームの会話ウィンドウ" },
+  { key:"tanmatsu", name:"たんまつ",   emoji:"\u25AE",    desc:"コマンドラインの部屋" }
 ];
 function applySkin(key){
   const k = SKINS.some(s => s.key === key) ? key : "default";
