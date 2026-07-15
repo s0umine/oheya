@@ -572,13 +572,31 @@
     border-radius:0;box-shadow:none;padding:2px 4px 14px;
   }
   html[data-skin="fumi"] .msg.user{
+    align-self:flex-start;max-width:100%;
     background:transparent;color:var(--text);
-    border-radius:0;padding:2px 12px 14px 4px;
-    border-right:2px solid var(--lamp);
+    border-radius:0;padding:2px 4px 14px;
   }
-  html[data-skin="fumi"] .ahead .avatar{display:none}
-  html[data-skin="fumi"] .ahead .sname{font-size:13px;color:var(--text)}
-  html[data-skin="fumi"] .ahead .sname::after{content:" ──";color:var(--muted)}
+  html[data-skin="fumi"] .ahead{display:none}
+  html[data-skin="fumi"] .meta{
+    align-self:flex-end;padding-left:0;padding-right:4px;
+    margin-top:-6px;opacity:.65;
+  }
+  html[data-skin="fumi"] .umline{opacity:.65}
+  html[data-skin="fumi"] .thought{margin:2px 0 4px}
+  html[data-skin="fumi"] .thought details{
+    background:transparent;border:none;border-radius:0;padding:0;
+  }
+  html[data-skin="fumi"] .thought summary{display:none}
+  html[data-skin="fumi"] .thought::before{
+    content:attr(data-name) "はこう思案した——";
+    display:block;color:var(--text);
+    font-size:calc(var(--msgfs,15px) - 1px);
+  }
+  html[data-skin="fumi"] .thought .tbody{
+    margin-top:8px;color:var(--text);opacity:.8;
+    line-height:2.05;font-size:calc(var(--msgfs,15px) - 1px);
+    padding:0 4px 6px;
+  }
   html[data-skin="fumi"] #roomScreen.has-bg .msg.assistant,
   html[data-skin="fumi"] #roomScreen.has-bg .msg.user{
     background:var(--bg);
@@ -1570,7 +1588,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.32.1 ─ 記録は、その場でしまう。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.33 ─ 記録は、その場でしまう。</p>
   </div>
 </aside>
 
@@ -1849,6 +1867,8 @@ function applySkin(key){
   if(send) send.textContent = (k === "shirushi") ? "\u2191" : "送る";
   const add = document.getElementById("addRoomBtn");
   if(add) add.textContent = (k === "shirushi") ? "\uFF0B" : "\uFF0B 新しい部屋";
+  /* ふみ：思考は折りたたまず地の文として見せる */
+  if(k === "fumi") document.querySelectorAll(".thought details").forEach(d => { d.open = true; });
 }
 function renderSkinGrid(){
   const grid = $("skinGrid");
@@ -2197,11 +2217,12 @@ function addNote(text){
   chatEl.appendChild(div);
   scrollBottom();
 }
-function addThought(text, open){
+function addThought(text, open, name){
   const wrap = document.createElement("div");
   wrap.className = "thought";
+  wrap.dataset.name = name || (currentRoom && currentRoom.name) || "だれか";
   const det = document.createElement("details");
-  if(open) det.open = true;
+  if(open || document.documentElement.dataset.skin === "fumi") det.open = true;
   const sum = document.createElement("summary");
   sum.textContent = "💭 考えごと";
   const body = document.createElement("div");
@@ -2802,7 +2823,7 @@ async function hirobaSpeak(child){
     const onText = (t, th) => {
       if(th && !thoughtEl){
         if(typing.parentNode) typing.remove();
-        thoughtEl = addThought("", true);
+        thoughtEl = addThought("", true, child.name);
       }
       if(thoughtEl && th) thoughtEl.querySelector(".tbody").textContent = th;
       if(t){
@@ -2936,8 +2957,8 @@ function renderChat(){
     const m = chat[i];
     if(m.role === "note") addNote(m.content);
     else{
-      if(m.role === "assistant" && m.reasoning) addThought(m.reasoning, false);
       const spk = (m.speakerId && currentRoom && currentRoom.isHiroba) ? rooms.find(r => r.id === m.speakerId) : null;
+      if(m.role === "assistant" && m.reasoning) addThought(m.reasoning, false, (spk || currentRoom || {}).name);
       const el = addBubble(m.role, m.content, m.usage, m.imgId, spk || undefined, m);
       if(el){
         el.dataset.ci = i;
@@ -3779,7 +3800,7 @@ async function sendText(text, apiOnlyExtra, image, opts){
       const r = await callLLM(messages, tools, (t, th) => {
         if(th && !thoughtEl){
           if(typing.parentNode) typing.remove();
-          thoughtEl = addThought("", true);
+          thoughtEl = addThought("", true, currentRoom.name);
         }
         if(thoughtEl && th){
           thoughtEl.querySelector(".tbody").textContent = th;
