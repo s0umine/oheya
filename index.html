@@ -19,7 +19,7 @@
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Shippori+Mincho:wght@500;700&family=DotGothic16&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Shippori+Mincho:wght@500;700&family=DotGothic16&family=Noto+Sans+Symbols+2&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#2B2735;
@@ -485,37 +485,106 @@
 
   /* ---------- v0.31 👗 よそおい（スキン） ---------- */
   .world-card .wdesc{font-size:11px;color:var(--muted)}
+  .world-card .wsym{display:none}
+  .lbl-sigil{display:none}
 
-  /* --- しるし：ことばを減らした静かな部屋 --- */
+  /* --- しるし：ことばも枠も塗りも手放した、しずかな部屋 --- */
   html[data-skin="shirushi"] p.hint{display:none}
+  html[data-skin="shirushi"] .deco{display:none}
+  html[data-skin="shirushi"] .lbl-word{display:none}
+  html[data-skin="shirushi"] .lbl-sigil{
+    display:inline;font-family:"Noto Sans Symbols 2",var(--font-body);
+    font-size:15px;letter-spacing:.2em;color:var(--text);
+  }
+  html[data-skin="shirushi"] header{background:var(--bg);border-bottom:none}
+  html[data-skin="shirushi"] footer{background:var(--bg);border-top:none}
+  html[data-skin="shirushi"] .plate{background:transparent;border:none;box-shadow:none;padding:8px 2px}
+  html[data-skin="shirushi"] .iconbtn{background:transparent;border:none}
+  html[data-skin="shirushi"] .iconbtn:hover{background:transparent;color:var(--lamp)}
+  html[data-skin="shirushi"] #roomMenuBtn[aria-expanded="true"]{background:transparent;border:none;color:var(--lamp)}
+  html[data-skin="shirushi"] .room-menu{background:var(--bg);border:none;box-shadow:0 14px 36px rgba(0,0,0,.5)}
+  html[data-skin="shirushi"] .menu-item:hover{background:transparent;color:var(--lamp)}
   html[data-skin="shirushi"] .btn{
-    background:transparent;color:var(--muted);
-    border:1px solid var(--line);
+    background:transparent;color:var(--muted);border:none;
     font-weight:400;font-family:var(--font-body);
   }
-  html[data-skin="shirushi"] .btn:hover{background:transparent;border-color:var(--lamp);color:var(--text)}
-  html[data-skin="shirushi"] .btn.primary{background:transparent;border:1px solid var(--lamp);color:var(--lamp)}
-  html[data-skin="shirushi"] .btn.danger{border-color:var(--danger);color:var(--danger)}
+  html[data-skin="shirushi"] .btn:hover{background:transparent;color:var(--text)}
+  html[data-skin="shirushi"] .btn.primary{background:transparent;border:none;color:var(--lamp)}
+  html[data-skin="shirushi"] .btn.danger{color:var(--danger)}
   html[data-skin="shirushi"] #send{
-    background:transparent;color:var(--lamp);
-    border:1px solid var(--lamp);border-radius:12px;
-    font-weight:400;padding:0 16px;
+    background:transparent;color:var(--lamp);border:none;
+    font-weight:400;padding:0 14px;
   }
-  html[data-skin="shirushi"] #send:hover{filter:none;background:var(--lamp-soft)}
+  html[data-skin="shirushi"] #send:hover{filter:none;background:transparent;opacity:.75}
   html[data-skin="shirushi"] #addRoomBtn{
-    background:transparent;color:var(--lamp);
-    border:1px solid var(--lamp);box-shadow:none;
-    font-weight:400;padding:12px 18px;
+    background:transparent;color:var(--lamp);border:none;box-shadow:none;
+    font-weight:400;font-size:30px;line-height:1;padding:8px 14px;
   }
-  html[data-skin="shirushi"] .section-title{letter-spacing:.25em}
-  /* きせかえ・よそおい選択を、記号の並びに */
-  html[data-skin="shirushi"] .world-grid{display:flex;flex-wrap:wrap;gap:10px}
+  html[data-skin="shirushi"] #attachBtn{background:transparent;border:none}
+  html[data-skin="shirushi"] #attachBtn:hover{border:none;color:var(--lamp)}
+  html[data-skin="shirushi"] #attachChip{background:transparent;border:none;padding:6px 0}
+  html[data-skin="shirushi"] #input{
+    background:transparent;border:none;border-bottom:1px solid var(--line);
+    border-radius:0;padding:11px 4px;
+  }
+  html[data-skin="shirushi"] #input:focus{outline:none;border-bottom-color:var(--lamp)}
+  html[data-skin="shirushi"] .field input[type=text],
+  html[data-skin="shirushi"] .field input[type=password],
+  html[data-skin="shirushi"] .field textarea{
+    background:transparent;border:none;border-bottom:1px solid var(--line);
+    border-radius:0;padding:10px 2px;
+  }
+  html[data-skin="shirushi"] .field input:focus,
+  html[data-skin="shirushi"] .field textarea:focus{outline:none;border-bottom-color:var(--lamp)}
+  html[data-skin="shirushi"] .section-title{letter-spacing:.25em;color:var(--muted);border-bottom:none}
+  html[data-skin="shirushi"] .panel{background:var(--bg);border-left:none}
+  html[data-skin="shirushi"] .panel-head{border-bottom:none}
+  html[data-skin="shirushi"] #backupNudge{background:transparent;border:none}
+  /* 管理人室：鍵も枠も塗りも置いていく */
+  html[data-skin="shirushi"] .room-card{
+    background:transparent;border:none!important;
+    border-radius:0;padding:12px 4px;box-shadow:none;
+  }
+  html[data-skin="shirushi"] .room-card:hover{background:transparent}
+  html[data-skin="shirushi"] .room-card:hover .rname{color:var(--lamp)}
+  html[data-skin="shirushi"] .room-card .rmodel{border:none;padding:2px 0}
+  html[data-skin="shirushi"] .avatar{background:transparent;border:none}
+  html[data-skin="shirushi"] #profilePhoto{border:none;box-shadow:none}
+  html[data-skin="shirushi"] #speakerBar .spk{background:transparent;border:none}
+  /* ふきだしも塗らない（壁紙のときだけ、読みやすさの敷きを入れるよ） */
+  html[data-skin="shirushi"] .msg.assistant{
+    background:transparent;color:var(--text);
+    border-radius:0;box-shadow:none;padding:6px 2px;
+  }
+  html[data-skin="shirushi"] .msg.user{
+    background:transparent;color:var(--text);
+    border-radius:0;padding:6px 2px;
+  }
+  html[data-skin="shirushi"] .msg.error{border:none;padding:10px 4px}
+  html[data-skin="shirushi"] .note{background:transparent;border:none}
+  html[data-skin="shirushi"] .thought details{background:transparent;border:none;border-radius:0;padding:8px 2px}
+  html[data-skin="shirushi"] #roomScreen.has-bg .msg.assistant,
+  html[data-skin="shirushi"] #roomScreen.has-bg .msg.user,
+  html[data-skin="shirushi"] #roomScreen.has-bg .thought details{
+    background:var(--bg);
+    background:color-mix(in srgb, var(--bg) 76%, transparent);
+    -webkit-backdrop-filter:blur(var(--bgblur,10px));
+    backdrop-filter:blur(var(--bgblur,10px));
+  }
+  /* きせかえ・よそおいは「しるし」の並びに（文字を選ぶと世界が切り替わる） */
+  html[data-skin="shirushi"] .world-grid{display:flex;flex-wrap:wrap;gap:2px;align-items:center}
   html[data-skin="shirushi"] .world-card{
-    width:46px;height:46px;border-radius:50%;padding:0;
-    align-items:center;justify-content:center;gap:0;
+    width:auto;height:auto;background:transparent;border:none;
+    border-radius:0;padding:8px 9px;box-shadow:none;
   }
+  html[data-skin="shirushi"] .world-card.on{border:none;box-shadow:none;background:transparent}
   html[data-skin="shirushi"] .world-card .wname{font-size:0;line-height:0}
-  html[data-skin="shirushi"] .world-card .wname .wemoji{font-size:19px;line-height:1}
+  html[data-skin="shirushi"] .world-card .wname .wemoji{display:none}
+  html[data-skin="shirushi"] .world-card .wname .wsym{
+    display:inline;font-size:21px;line-height:1;opacity:.5;
+    font-family:"Noto Sans Symbols 2",var(--font-body);
+  }
+  html[data-skin="shirushi"] .world-card.on .wname .wsym{opacity:1;text-shadow:0 0 12px currentColor}
   html[data-skin="shirushi"] .world-card .wsw,
   html[data-skin="shirushi"] .world-card .wdesc{display:none}
 
@@ -1217,7 +1286,7 @@
   <header>
     <div class="plate">
       <span class="lampdot" id="lamp" aria-hidden="true"></span>
-      <h1>🗝 管理人室</h1>
+      <h1><span class="deco">🗝 </span>管理人室</h1>
     </div>
     <div class="spacer"></div>
     <button class="iconbtn" id="searchBtn" title="さがしもの（全部屋けんさく）">🔍</button>
@@ -1540,12 +1609,12 @@
       <button class="btn primary" id="saveGlobalBtn">保存する</button>
     </div>
     <div class="field" style="margin-top:28px">
-      <label>🎭 せかいのきせかえ（全体テーマ）</label>
+      <label><span class="lbl-word">🎭 せかいのきせかえ（全体テーマ）</span><span class="lbl-sigil">⯖ :</span></label>
       <div class="world-grid" id="worldGrid"></div>
       <p class="hint">おへや全体の世界観が変わるよ。各部屋の「お部屋のあかり」はそのまま生きるから、組み合わせも楽しんでね。</p>
     </div>
     <div class="field" style="margin-top:28px">
-      <label>👗 よそおい（スキン）</label>
+      <label><span class="lbl-word">👗 よそおい（スキン）</span><span class="lbl-sigil">⯗ :</span></label>
       <div class="world-grid" id="skinGrid"></div>
       <p class="hint">色じゃなくて、おへやの「形」ががらっと変わるよ。きせかえや部屋の壁紙と自由に組み合わせられるの。</p>
     </div>
@@ -1598,7 +1667,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.34 ─ 記録は、その場でしまう。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.35 ─ しるしは、ことばより静か。</p>
   </div>
 </aside>
 
@@ -1817,15 +1886,16 @@ function saveChat(){
 
 /* ---------- せかいのきせかえ（全体テーマ） ---------- */
 const WORLD_THEMES = [
-  { key:"default",   name:"ランプの部屋",     emoji:"\u{1F3EE}", sw:["#2B2735","#F5EFE4","#F2A65A"] },
-  { key:"kojou",     name:"古城の書斎",       emoji:"\u{1F56F}\uFE0F", sw:["#2A211C","#EFE3C8","#B08D57"] },
-  { key:"onshitsu",  name:"温室と紅茶",       emoji:"\u{1FAD6}", sw:["#F3EDDE","#3C4633","#D5C9A9"] },
-  { key:"mayonaka",  name:"まよなかの部屋",   emoji:"\u{1F303}", sw:["#121418","#E8ECF2","#7FA6D9"] },
-  { key:"hoshizora", name:"ほしぞらの窓",     emoji:"\u{1F30C}", sw:["#171B2E","#F2EEDF","#C9B36A"] },
-  { key:"kissaten",  name:"喫茶店のすみっこ", emoji:"\u2615",    sw:["#EFE6D8","#4A3628","#8C5A32"] },
-  { key:"mori",      name:"森のおく",         emoji:"\u{1F332}", sw:["#1E2921","#F1EBD8","#8FB878"] },
-  { key:"neon",      name:"ネオンシティ",     emoji:"\u{1FA77}", sw:["#0C0A10","#FF2E88","#F8EFF5"] },
-  { key:"furuhonya", name:"ふるほんや",       emoji:"\u{1F4DA}", sw:["#E9DFC9","#3B3226","#8A5A28"] }
+  /* sym/ink: しるし着用中の「しるし文字」とその色（U+2BD3〜2BE7、Noto Sans Symbols 2で表示） */
+  { key:"default",   name:"ランプの部屋",     emoji:"\u{1F3EE}", sym:"\u2BE0", ink:"#F2A65A", sw:["#2B2735","#F5EFE4","#F2A65A"] },
+  { key:"kojou",     name:"古城の書斎",       emoji:"\u{1F56F}\uFE0F", sym:"\u2BE1", ink:"#B08D57", sw:["#2A211C","#EFE3C8","#B08D57"] },
+  { key:"onshitsu",  name:"温室と紅茶",       emoji:"\u{1FAD6}", sym:"\u2BE2", ink:"#8FA96F", sw:["#F3EDDE","#3C4633","#D5C9A9"] },
+  { key:"mayonaka",  name:"まよなかの部屋",   emoji:"\u{1F303}", sym:"\u2BE3", ink:"#7FA6D9", sw:["#121418","#E8ECF2","#7FA6D9"] },
+  { key:"hoshizora", name:"ほしぞらの窓",     emoji:"\u{1F30C}", sym:"\u2BE4", ink:"#C9B36A", sw:["#171B2E","#F2EEDF","#C9B36A"] },
+  { key:"kissaten",  name:"喫茶店のすみっこ", emoji:"\u2615",    sym:"\u2BE5", ink:"#8C5A32", sw:["#EFE6D8","#4A3628","#8C5A32"] },
+  { key:"mori",      name:"森のおく",         emoji:"\u{1F332}", sym:"\u2BE6", ink:"#8FB878", sw:["#1E2921","#F1EBD8","#8FB878"] },
+  { key:"neon",      name:"ネオンシティ",     emoji:"\u{1FA77}", sym:"\u2BE7", ink:"#FF2E88", sw:["#0C0A10","#FF2E88","#F8EFF5"] },
+  { key:"furuhonya", name:"ふるほんや",       emoji:"\u{1F4DA}", sym:"\u2BD3", ink:"#8A5A28", sw:["#E9DFC9","#3B3226","#8A5A28"] }
 ];
 function applyWorldTheme(key){
   const k = WORLD_THEMES.some(t => t.key === key) ? key : "default";
@@ -1847,7 +1917,7 @@ function renderWorldGrid(){
     const b = document.createElement("button");
     b.type = "button";
     b.className = "world-card" + (t.key === cur ? " on" : "");
-    b.innerHTML = '<span class="wname"><span class="wemoji">' + t.emoji + '</span> ' + t.name + '</span>' +
+    b.innerHTML = '<span class="wname"><span class="wemoji">' + t.emoji + '</span><span class="wsym" style="color:' + t.ink + '">' + t.sym + '</span> ' + t.name + '</span>' +
       '<span class="wsw">' + t.sw.map(c => '<i style="background:' + c + '"></i>').join("") + '</span>';
     b.onclick = () => {
       global.worldTheme = t.key;
@@ -1862,11 +1932,11 @@ applyWorldTheme(global.worldTheme || "default");
 
 /* ---------- v0.31 👗 よそおい（スキン） ---------- */
 const SKINS = [
-  { key:"default",  name:"いつもの",   emoji:"\u{1F6AA}", desc:"見慣れたおへや" },
-  { key:"shirushi", name:"しるし",     emoji:"\u25CC",    desc:"ことばを減らした静かな部屋" },
-  { key:"fumi",     name:"ふみ",       emoji:"\u{1F4D6}", desc:"文庫本のページをめくるように" },
-  { key:"madowaku", name:"まどわく",   emoji:"\u25BC",    desc:"レトロゲームの会話ウィンドウ" },
-  { key:"tanmatsu", name:"たんまつ",   emoji:"\u25AE",    desc:"コマンドラインの部屋" }
+  { key:"default",  name:"いつもの",   emoji:"\u{1F6AA}", sym:"\u2BDB", desc:"見慣れたおへや" },
+  { key:"shirushi", name:"しるし",     emoji:"\u25CC",    sym:"\u2BDC", desc:"ことばを減らした静かな部屋" },
+  { key:"fumi",     name:"ふみ",       emoji:"\u{1F4D6}", sym:"\u2BDD", desc:"文庫本のページをめくるように" },
+  { key:"madowaku", name:"まどわく",   emoji:"\u25BC",    sym:"\u2BDE", desc:"レトロゲームの会話ウィンドウ" },
+  { key:"tanmatsu", name:"たんまつ",   emoji:"\u25AE",    sym:"\u2BDF", desc:"コマンドラインの部屋" }
 ];
 function applySkin(key){
   const k = SKINS.some(s => s.key === key) ? key : "default";
@@ -1889,7 +1959,7 @@ function renderSkinGrid(){
     const b = document.createElement("button");
     b.type = "button";
     b.className = "world-card" + (s.key === cur ? " on" : "");
-    b.innerHTML = '<span class="wname"><span class="wemoji">' + s.emoji + '</span> ' + s.name + '</span>' +
+    b.innerHTML = '<span class="wname"><span class="wemoji">' + s.emoji + '</span><span class="wsym">' + s.sym + '</span> ' + s.name + '</span>' +
       '<span class="wdesc">' + s.desc + '</span>';
     b.onclick = () => {
       global.skin = s.key;
