@@ -1426,6 +1426,7 @@
       <div class="selected-model" id="selectedModel"></div>
       <p class="hint">検索して選ぶか、モデルIDを直接貼ってもOK。</p>
       <button class="btn" id="localModelsBtn" style="margin-top:6px">🏠 ローカルの子をさがす（LM Studio）</button>
+      <button class="btn" id="webModelsBtn" style="margin-top:6px">🌱 この端末に住む子をさがす（実験）</button>
     </div>
     <div class="field">
       <label for="sysPrompt">この子のプロンプト（性格・口調・設定）</label>
@@ -1667,7 +1668,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.35 ─ しるしは、ことばより静か。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.36 ─ 端末の中に、小さな灯り。</p>
   </div>
 </aside>
 
@@ -2854,7 +2855,7 @@ async function directorPick(members){
 
 async function omakaseRun(maxTurns){
   if(omakaseRunning || sending || !currentRoom || !currentRoom.isHiroba) return;
-  if(!global.apiKey && currentRoom.provider !== "local"){ addError("APIキーが未設定だよ。管理人室の⚙️からどうぞ。"); return; }
+  if(!global.apiKey && !keyless(currentRoom)){ addError("APIキーが未設定だよ。管理人室の⚙️からどうぞ。"); return; }
   if(!currentRoom.model){ addError("采配役のモデルがまだ決まってないよ。広間の👤で選んでね（軽くて安いモデルで大丈夫）。"); return; }
   const members = (currentThread && currentThread.members || []).map(id => rooms.find(r => r.id === id)).filter(Boolean);
   if(members.length === 0){ addError("まずは🎟でメンバーをよんでね。"); return; }
@@ -2884,7 +2885,7 @@ async function omakaseRun(maxTurns){
 /* 指名された子が話すよ */
 async function hirobaSpeak(child){
   if(sending || !currentRoom || !currentRoom.isHiroba) return;
-  if(!global.apiKey && child.provider !== "local"){ addError("APIキーが未設定だよ。管理人室の⚙️からどうぞ。"); return; }
+  if(!global.apiKey && !keyless(child)){ addError("APIキーが未設定だよ。管理人室の⚙️からどうぞ。"); return; }
   if(!child.model){ addError(child.name + "のモデルがまだ決まってないよ。その子の部屋の👤で選んでね。"); return; }
   sending = true; sendBtn.disabled = true;
   renderSpeakerBar();
@@ -3612,9 +3613,100 @@ function execTool(room, name, args){
   return { result, note };
 }
 
+/* ---------- v0.36 🌱 この端末に住む子（WebLLM・実験） ---------- */
+/* モデルはブラウザの中で直接動く。サーバー不要・通信は初回のお迎えDLだけ */
+function keyless(room){ return !!room && (room.provider === "local" || room.provider === "web"); }
+
+const WEB_MODELS = [
+  { base:"Qwen2.5-0.5B-Instruct", label:"Qwen2.5 0.5B", size:"約0.4GB", note:"いちばん軽い子。まずはこの子で動作確認を" },
+  { base:"Qwen2.5-1.5B-Instruct", label:"Qwen2.5 1.5B", size:"約0.9GB", note:"軽さと賢さのバランス。日本語もそこそこ" },
+  { base:"Llama-3.2-1B-Instruct", label:"Llama 3.2 1B", size:"約0.7GB", note:"英語が得意な子" },
+  { base:"gemma-2-2b-it",         label:"Gemma 2 2B",   size:"約1.4GB", note:"少し賢く、少し重い（PC・新しめの端末向き）" }
+];
+let webllmLib = null, webEngine = null, webEngineModel = "";
+let webF16 = null; /* WebGPUがf16対応か（お迎え時に判定） */
+
+async function loadWebllmLib(){
+  if(webllmLib) return webllmLib;
+  webllmLib = await import("https://esm.run/@mlc-ai/web-llm");
+  return webllmLib;
+}
+async function webGpuProbe(){
+  if(!("gpu" in navigator)) return null;
+  try{
+    const ad = await navigator.gpu.requestAdapter();
+    if(!ad) return null;
+    return { f16: ad.features && ad.features.has("shader-f16") };
+  }catch(e){ return null; }
+}
+/* 端末のf16対応と、WebLLM側の在庫（prebuilt一覧）を突き合わせて実IDを決める */
+function resolveWebModelId(lib, base, f16){
+  const list = (lib.prebuiltAppConfig && lib.prebuiltAppConfig.model_list) || [];
+  const want = base + (f16 ? "-q4f16_1-MLC" : "-q4f32_1-MLC");
+  const alt  = base + (f16 ? "-q4f32_1-MLC" : "-q4f16_1-MLC");
+  if(list.some(m => m.model_id === want)) return want;
+  if(list.some(m => m.model_id === alt)) return alt;
+  const any = list.find(m => m.model_id && m.model_id.startsWith(base));
+  return any ? any.model_id : null;
+}
+async function ensureWebEngine(modelId, onProgress){
+  const lib = await loadWebllmLib();
+  if(webEngine && webEngineModel === modelId) return webEngine;
+  if(webEngine){ try{ await webEngine.unload(); }catch(e){} webEngine = null; webEngineModel = ""; }
+  const eng = await lib.CreateMLCEngine(modelId, {
+    initProgressCallback: p => { if(onProgress) onProgress(p); }
+  });
+  webEngine = eng; webEngineModel = modelId;
+  return eng;
+}
+/* 小さい子向けに整える: 画像・ツールの話は落とし、履歴も浅めに */
+function flattenForWeb(messages){
+  const out = [];
+  for(const m of messages){
+    if(m.role !== "system" && m.role !== "user" && m.role !== "assistant") continue;
+    let c = m.content;
+    if(Array.isArray(c)) c = c.map(p => p && p.type === "text" ? p.text : "（画像が添えられていたけど、この子には見えないよ）").join("\n");
+    out.push({ role: m.role, content: String(c ?? "") });
+  }
+  const sys = out.filter(m => m.role === "system");
+  const rest = out.filter(m => m.role !== "system");
+  return sys.concat(rest.slice(-16));
+}
+async function callWebLLM(messages, onText, asRoom){
+  let engine;
+  try{
+    engine = await ensureWebEngine(asRoom.model, p => {
+      const pct = Math.round((p && p.progress ? p.progress : 0) * 100);
+      if(onText) onText("", "🌱 この子をお迎え中… " + pct + "%（初回だけ。次からはすぐだよ）");
+    });
+  }catch(e){
+    const gpu = await webGpuProbe();
+    if(!gpu) throw { jp: "🌱 この端末のブラウザではWebGPUが使えないみたい。iPhoneならiOSを最新にしてSafariで、PCならChrome/Edgeで試してみて。" };
+    throw { jp: "🌱 この子のお迎えに失敗しちゃった…。ネット接続と空き容量を確認して、もう一度試してみて。それでもダメなら、もっと小さい子でリベンジを。" };
+  }
+  try{
+    const chunks = await engine.chat.completions.create({
+      messages: flattenForWeb(messages),
+      stream: true,
+      stream_options: { include_usage: true },
+      temperature: 0.8
+    });
+    let text = "", usage = null;
+    for await (const ch of chunks){
+      const d = ch.choices && ch.choices[0] && ch.choices[0].delta && ch.choices[0].delta.content;
+      if(d){ text += d; if(onText) onText(text, ""); }
+      if(ch.usage) usage = ch.usage;
+    }
+    return { text, reasoning:"", usage, toolCalls: [] };
+  }catch(e){
+    throw { jp: "🌱 考えてる途中で息切れしちゃったみたい（端末のメモリ不足かも）。他のタブやアプリを閉じるか、もっと小さい子で試してみて。" };
+  }
+}
+
 /* ---------- LLM呼び出し（ストリーミング＋ツール対応） ---------- */
 async function callLLM(messages, tools){
   const asRoom = arguments[3] || currentRoom; /* 広間では「今話す子」を渡す */
+  if(asRoom.provider === "web") return await callWebLLM(messages, arguments[2], asRoom);
   const isLocal = asRoom.provider === "local";
   const body = {
     model: asRoom.model,
@@ -3800,7 +3892,7 @@ async function sendText(text, apiOnlyExtra, image, opts){
     finally{ sending = false; sendBtn.disabled = false; renderSpeakerBar(); refocusInput(); }
     return;
   }
-  if(!global.apiKey && currentRoom.provider !== "local"){ addError("APIキーが未設定だよ。管理人室の⚙️からどうぞ。"); return; }
+  if(!global.apiKey && !keyless(currentRoom)){ addError("APIキーが未設定だよ。管理人室の⚙️からどうぞ。"); return; }
   if(!currentRoom.model){ addError("この部屋のモデルがまだ決まってないよ。👤で選んでね。"); return; }
 
   if(chat.length === 0) chatEl.innerHTML = "";
@@ -5030,6 +5122,43 @@ $("localModelsBtn").onclick = async () => {
     list.innerHTML = '<div class="model-item">ローカルLLMに繋がらなかった…。LM Studioで ①ローカルサーバーがON ②CORSがON ③モデルがロード済み か確認してね。接続先: ' + esc(localApiUrl()) + '（⚙️で変更できるよ）</div>';
   }
 };
+$("webModelsBtn").onclick = async () => {
+  const list = $("modelList");
+  list.innerHTML = '<div class="model-item">🌱 この端末で暮らせる子をさがしてる…</div>';
+  list.classList.add("show");
+  const gpu = await webGpuProbe();
+  if(!gpu){
+    list.innerHTML = '<div class="model-item">🌱 この端末のブラウザではWebGPUが使えないみたい。iPhoneならiOSを最新にしてSafariで、PCならChrome/Edgeで開いてみて。</div>';
+    return;
+  }
+  webF16 = gpu.f16;
+  let lib;
+  try{ lib = await loadWebllmLib(); }
+  catch(e){
+    list.innerHTML = '<div class="model-item">🌱 部品（WebLLM）のお取り寄せに失敗しちゃった。ネット接続を確認して、もう一度押してみて。</div>';
+    return;
+  }
+  list.innerHTML = '<div class="model-item" style="opacity:.8">🌱 この子たちは<b>この端末の中だけ</b>で暮らすよ。APIキー不要・会話は外に出ない。初回だけお迎えダウンロードがあるからWi-Fi推奨！</div>';
+  let found = 0;
+  for(const w of WEB_MODELS){
+    const id = resolveWebModelId(lib, w.base, webF16);
+    if(!id) continue;
+    found++;
+    const item = document.createElement("div");
+    item.className = "model-item";
+    item.innerHTML = "🌱 " + esc(w.label) + ' <span class="mid">' + esc(w.size) + "・" + esc(w.note) + '</span>';
+    item.onclick = () => {
+      pendingModel = { id: id, name: w.label + "（この端末）", provider: "web" };
+      showSelectedModel();
+      list.classList.remove("show");
+      $("modelSearch").value = "";
+    };
+    list.appendChild(item);
+  }
+  if(found === 0){
+    list.innerHTML = '<div class="model-item">🌱 うまく在庫表が読めなかった…。時間をおいてもう一度試してみて。</div>';
+  }
+};
 async function fetchModels(){
   if(allModels) return allModels;
   const res = await fetch("https://openrouter.ai/api/v1/models");
@@ -5740,7 +5869,9 @@ async function maybeDeliverLetter(room){
   try{
     if(!room || !room.letterEnabled || room.isHiroba) return;
     if(sending || omakaseRunning) return;
-    if(room.provider !== "local" && !global.apiKey) return;
+    if(!keyless(room) && !global.apiKey) return;
+    /* 🌱この端末に住む子は、すでに起きている時だけ手紙を書くよ（勝手にお迎えDLしない） */
+    if(room.provider === "web" && !(webEngine && webEngineModel === room.model)) return;
     if(!chat.length) return; /* まだ会話のない部屋には届かないよ */
     const last = chat[chat.length - 1].ts;
     if(!last) return;
@@ -5811,7 +5942,7 @@ async function maybeDeliverLetter(room){
 async function hirobaOmiyage(){
   if(sending || omakaseRunning || !currentRoom || !currentRoom.isHiroba) return;
   if(!global.apiKey){
-    const hasLocal = rooms.some(r => r.provider === "local");
+    const hasLocal = rooms.some(r => keyless(r));
     if(!hasLocal){ addError("APIキーが未設定だよ。管理人室の⚙️からどうぞ。"); return; }
   }
   const members = (currentThread && currentThread.members || []).map(id => rooms.find(r => r.id === id)).filter(Boolean);
