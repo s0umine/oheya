@@ -1595,7 +1595,10 @@
     <div class="field">
       <label for="localUrl">🏠 ローカルLLMの接続先（LM Studioなど・任意）</label>
       <input type="text" id="localUrl" placeholder="http://localhost:1234/v1" autocomplete="off">
-      <input type="password" id="localToken" placeholder="🔑 ローカルのAPIトークン（必要な時だけ）" autocomplete="off" style="margin-top:8px">
+      <div class="row" style="margin-top:8px">
+        <input type="password" id="localToken" placeholder="🔑 ローカルのAPIトークン（必要な時だけ）" autocomplete="off">
+        <button class="btn" id="toggleLocalToken" style="flex:0 0 auto">表示</button>
+      </div>
       <p class="hint">LM Studio側でサーバーONとCORSをONにしてね。Tailscaleなどで外から繋ぐ時にLM Studioがトークン（合言葉）を求める設定なら、同じものを🔑欄に入れてね。</p>
       <label for="imgModel" style="margin-top:18px;display:block">🎨 絵筆（お絵かきモデル・任意）</label>
       <input type="text" id="imgModel" placeholder="例: google/gemini-2.5-flash-image" autocomplete="off">
@@ -1669,7 +1672,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.36.1 ─ 遠くの灯りに、合言葉を。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.36.2 ─ 合言葉は、目で見て確かめる。</p>
   </div>
 </aside>
 
@@ -3743,6 +3746,7 @@ async function callLLM(messages, tools){
   if(!res.ok){
     let apiMsg = "";
     try{ const j = await res.json(); apiMsg = j?.error?.message || ""; }catch(e){}
+    if(isLocal) throw { jp: "🏠には届いたけど断られちゃった（" + res.status + "）" + (apiMsg ? "。サーバーの言い分:「" + apiMsg + "」" : "") + "。トークン絡みなら⚙️の🔑欄をLM Studioと突き合わせてみて。" };
     throw { jp: jpError(res.status, apiMsg) };
   }
 
@@ -5099,7 +5103,12 @@ $("localModelsBtn").onclick = async () => {
   list.classList.add("show");
   try{
     const res = await fetch(localApiUrl() + "/models", { headers: { "Authorization": "Bearer " + (global.localToken || "lm-studio") } });
-    if(!res.ok) throw new Error("models");
+    if(!res.ok){
+      let serverMsg = "";
+      try{ serverMsg = (await res.text()).slice(0, 200); }catch(e){}
+      list.innerHTML = '<div class="model-item">🏠には届いたけど、断られちゃった（' + res.status + '）。サーバーの言い分:<br><b>' + esc(serverMsg || "（無言）") + '</b><br>トークン絡みなら、⚙️の🔑欄を「表示」で見て、LM Studioのトークンと一字一句同じか確認してみて。</div>';
+      return;
+    }
     const j = await res.json();
     const models = (j.data || []).map(m => m.id);
     if(models.length === 0){
@@ -5245,6 +5254,11 @@ $("globalSettingsBtn").onclick = () => {
   $("apiKey").value = global.apiKey;
   $("localUrl").value = global.localUrl || "";
   $("localToken").value = global.localToken || "";
+  $("toggleLocalToken").onclick = () => {
+    const el = $("localToken");
+    el.type = el.type === "password" ? "text" : "password";
+    $("toggleLocalToken").textContent = el.type === "password" ? "表示" : "隠す";
+  };
   $("imgModel").value = global.imgModel || "";
   renderTextPrefs();
   renderViewportDiag();
@@ -5286,7 +5300,7 @@ $("imgModelsBtn").onclick = async () => {
 $("saveGlobalBtn").onclick = () => {
   global.apiKey = $("apiKey").value.trim();
   global.localUrl = $("localUrl").value.trim();
-  global.localToken = $("localToken").value.trim();
+  global.localToken = $("localToken").value.replace(/\s+/g, "");
   global.imgModel = $("imgModel").value.trim();
   save(LS_GLOBAL, global);
   renderLobby();
