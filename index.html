@@ -1446,6 +1446,13 @@
     </div>
     <div class="field">
       <label class="check">
+        <input type="checkbox" id="searchEnabled">
+        🔍 しらべもの（この子が自分でweb検索できるようになるよ）
+      </label>
+      <p class="hint">OpenRouterの部屋だけ使えるよ。調べたい時に子が自分で検索して、見つけたページを開くこともできるの。検索1回あたり数円くらい（結果1件≒0.6円）。</p>
+    </div>
+    <div class="field">
+      <label class="check">
         <input type="checkbox" id="diaryEnabled">
         📔 日記帳を使う（この子が自分で日記を書いて、読み返せるようになるよ）
       </label>
@@ -1672,7 +1679,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.36.2 ─ 合言葉は、目で見て確かめる。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.37 ─ 調べものは、じぶんの足で。</p>
   </div>
 </aside>
 
@@ -3723,6 +3730,13 @@ async function callLLM(messages, tools){
     body.usage = { include: true };
   }
   if(tools && tools.length) body.tools = tools;
+  /* 🔍しらべもの: 子が自分の判断でwebを検索・閲覧できるサーバーツール（OpenRouterの部屋だけ） */
+  if(!isLocal && asRoom.provider !== "web" && asRoom.searchEnabled){
+    body.tools = (body.tools || []).concat([
+      { type: "openrouter:web_search", parameters: { max_results: 3, max_total_results: 9 } },
+      { type: "openrouter:web_fetch",  parameters: { engine: "openrouter", max_content_tokens: 4000 } }
+    ]);
+  }
   /* Claude系はこの1行でプロンプトキャッシュが効く（長い会話の再読込が割引になる） */
   if(!isLocal && /^anthropic\//.test(asRoom.model || "")) body.cache_control = { type: "ephemeral" };
   if(!isLocal && asRoom.reasoningEnabled) body.reasoning = { enabled: true };
@@ -4833,6 +4847,7 @@ function openProfile(){
   $("userNote").value = currentRoom.userNote || "";
   $("hirobaPrompt").value = currentRoom.hirobaPrompt || "";
   $("memoryEnabled").checked = !!currentRoom.memoryEnabled;
+  $("searchEnabled").checked = !!currentRoom.searchEnabled;
   $("diaryEnabled").checked = !!currentRoom.diaryEnabled;
   $("ayumiEnabled").checked = !!currentRoom.ayumiEnabled;
   $("reasoningEnabled").checked = !!currentRoom.reasoningEnabled;
@@ -5030,6 +5045,7 @@ $("saveProfileBtn").onclick = () => {
   currentRoom.userNote = $("userNote").value;
   currentRoom.hirobaPrompt = $("hirobaPrompt").value;
   currentRoom.memoryEnabled = $("memoryEnabled").checked;
+  currentRoom.searchEnabled = $("searchEnabled").checked;
   currentRoom.diaryEnabled = $("diaryEnabled").checked;
   currentRoom.ayumiEnabled = $("ayumiEnabled").checked;
   currentRoom.reasoningEnabled = $("reasoningEnabled").checked;
