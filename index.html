@@ -1595,7 +1595,8 @@
     <div class="field">
       <label for="localUrl">🏠 ローカルLLMの接続先（LM Studioなど・任意）</label>
       <input type="text" id="localUrl" placeholder="http://localhost:1234/v1" autocomplete="off">
-      <p class="hint">同じPCで動くLM Studioの「ローカルサーバー」のアドレスだよ。LM Studio側でサーバーONとCORSをONにしてね。</p>
+      <input type="password" id="localToken" placeholder="🔑 ローカルのAPIトークン（必要な時だけ）" autocomplete="off" style="margin-top:8px">
+      <p class="hint">LM Studio側でサーバーONとCORSをONにしてね。Tailscaleなどで外から繋ぐ時にLM Studioがトークン（合言葉）を求める設定なら、同じものを🔑欄に入れてね。</p>
       <label for="imgModel" style="margin-top:18px;display:block">🎨 絵筆（お絵かきモデル・任意）</label>
       <input type="text" id="imgModel" placeholder="例: google/gemini-2.5-flash-image" autocomplete="off">
       <button class="btn" id="imgModelsBtn" style="width:100%;margin-top:8px">🎨 お絵かきできるモデルをさがす</button>
@@ -1668,7 +1669,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.36 ─ 端末の中に、小さな灯り。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.36.1 ─ 遠くの灯りに、合言葉を。</p>
   </div>
 </aside>
 
@@ -3729,13 +3730,13 @@ async function callLLM(messages, tools){
     res = await fetch(endpoint, {
       method: "POST",
       headers: {
-        "Authorization": "Bearer " + (isLocal ? "lm-studio" : global.apiKey),
+        "Authorization": "Bearer " + (isLocal ? (global.localToken || "lm-studio") : global.apiKey),
         "Content-Type": "application/json"
       },
       body: JSON.stringify(body)
     });
   }catch(e){
-    if(isLocal) throw { jp: "🏠のローカルLLMに繋がらなかったよ。LM Studioで ①ローカルサーバーがON ②CORSがON ③モデルがロード済み か見てみて（接続先: " + localApiUrl() + "）" };
+    if(isLocal) throw { jp: "🏠のローカルLLMに繋がらなかったよ。LM Studioで ①ローカルサーバーがON ②CORSがON ③モデルがロード済み ④トークンが必要な設定なら⚙️の🔑欄と一致してるか 見てみて（接続先: " + localApiUrl() + "）" };
     throw e;
   }
 
@@ -5097,7 +5098,7 @@ $("localModelsBtn").onclick = async () => {
   list.innerHTML = '<div class="model-item">🏠に聞いてる…</div>';
   list.classList.add("show");
   try{
-    const res = await fetch(localApiUrl() + "/models");
+    const res = await fetch(localApiUrl() + "/models", { headers: { "Authorization": "Bearer " + (global.localToken || "lm-studio") } });
     if(!res.ok) throw new Error("models");
     const j = await res.json();
     const models = (j.data || []).map(m => m.id);
@@ -5119,7 +5120,7 @@ $("localModelsBtn").onclick = async () => {
       list.appendChild(item);
     }
   }catch(e){
-    list.innerHTML = '<div class="model-item">ローカルLLMに繋がらなかった…。LM Studioで ①ローカルサーバーがON ②CORSがON ③モデルがロード済み か確認してね。接続先: ' + esc(localApiUrl()) + '（⚙️で変更できるよ）</div>';
+    list.innerHTML = '<div class="model-item">ローカルLLMに繋がらなかった…。LM Studioで ①ローカルサーバーがON ②CORSがON ③モデルがロード済み ④トークンが必要な設定なら🔑欄と一致 を確認してね。接続先: ' + esc(localApiUrl()) + '（⚙️で変更できるよ）</div>';
   }
 };
 $("webModelsBtn").onclick = async () => {
@@ -5243,6 +5244,7 @@ async function renderStorageMeter(){
 $("globalSettingsBtn").onclick = () => {
   $("apiKey").value = global.apiKey;
   $("localUrl").value = global.localUrl || "";
+  $("localToken").value = global.localToken || "";
   $("imgModel").value = global.imgModel || "";
   renderTextPrefs();
   renderViewportDiag();
@@ -5284,6 +5286,7 @@ $("imgModelsBtn").onclick = async () => {
 $("saveGlobalBtn").onclick = () => {
   global.apiKey = $("apiKey").value.trim();
   global.localUrl = $("localUrl").value.trim();
+  global.localToken = $("localToken").value.trim();
   global.imgModel = $("imgModel").value.trim();
   save(LS_GLOBAL, global);
   renderLobby();
