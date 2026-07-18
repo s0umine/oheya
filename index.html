@@ -1380,6 +1380,7 @@
     <button class="menu-item" id="monoBtn">📖 ものしり帳</button>
     <button class="menu-item" id="ayumiBtn">📜 あゆみ帳</button>
     <button class="menu-item" id="obobiBtn">📅 おぼえ日帳</button>
+    <button class="menu-item" id="gazaiBtn">🎨 画材箱</button>
     <button class="menu-item" id="omiyageBtn" hidden>🎁 みんなでおみやげを書く</button>
     <button class="menu-item" id="newBtn">🧵 新しい会話をはじめる</button>
     <button class="menu-item" id="exportBtn">📄 この会話をMarkdownで保存</button>
@@ -1809,7 +1810,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.46 ─ うちの子が、ToDoのおつかいに行けるよ。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.47 ─ 画材箱をひらいたら、みんなの姿がブレないよ。</p>
   </div>
 </aside>
 
@@ -1877,6 +1878,26 @@
     </p>
     <div id="obobiList"></div>
     <button class="btn" id="obobiAddBtn" style="width:100%">＋ 新しいおぼえ日を書く</button>
+  </div>
+</aside>
+
+<!-- ========== 🎨 画材箱（v0.47） ========== -->
+<aside class="panel" id="gazaiPanel" aria-label="画材箱">
+  <div class="panel-head">
+    <h2>🎨 画材箱</h2>
+    <button class="iconbtn" data-close aria-label="閉じる">✕</button>
+  </div>
+  <div class="panel-body">
+    <p class="hint" style="margin-bottom:14px">
+      絵筆のときにお手本として一緒に渡す参考画像だよ。「リサの姿」「この子の姿」みたいになまえを付けておくと、姿や画風がブレにくくなるの。<b>同じなまえがこの部屋とみんなの棚の両方にあったら、この部屋のほうが勝つ</b>（重ね着方式）。参考画像は絵筆のたびに毎回送るから、1部屋あわせて2〜3枚が目安ね。
+    </p>
+    <div class="section-title" id="gazaiRoomTitle">この部屋の画材</div>
+    <div id="gazaiRoomList"></div>
+    <button class="btn" id="gazaiRoomAddBtn" style="width:100%">＋ この部屋に画材を置く</button>
+    <div class="section-title" style="margin-top:22px">みんなの画材棚（全部屋の絵筆に効くよ）</div>
+    <div id="gazaiSharedList"></div>
+    <button class="btn" id="gazaiSharedAddBtn" style="width:100%">＋ みんなの棚に画材を置く</button>
+    <input type="file" id="gazaiInput" accept="image/*" multiple hidden>
   </div>
 </aside>
 
@@ -3709,16 +3730,35 @@ async function execOekaki(room, args){
   if(!prompt) return { result: "エラー: promptがありません", note: null };
   if(!global.imgModel || !global.apiKey) return { result: "エラー: 絵筆（お絵かきモデル）が設定されていません", note: null };
   try{
+    /* v0.47 🎨 画材箱: 参考画像をお手本として一緒に渡す（重ね着方式） */
+    let content = prompt;
+    let refCount = 0;
+    try{
+      const refs = await gatherGazai(room.id);
+      if(refs.length){
+        refCount = refs.length;
+        const cap = refs.map((it, i) => (i + 1) + "枚目=" + (((it.name || "").trim()) || "参考画像")).join("、");
+        content = [
+          { type: "text", text: prompt + "\n\n（参考画像: " + cap + "。人物の顔立ち・姿・服の雰囲気・画風は、この参考画像に忠実に保って描いてください）" }
+        ].concat(refs.map(it => ({ type: "image_url", image_url: { url: it.dataUrl } })));
+      }
+    }catch(e){}
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + global.apiKey },
       body: JSON.stringify({
         model: global.imgModel,
-        messages: [{ role: "user", content: prompt }],
+        messages: [{ role: "user", content }],
         modalities: ["image", "text"]
       })
     });
-    if(!res.ok) return { result: "エラー: 絵筆が使えなかった（HTTP " + res.status + "）。⚙️のモデルIDを確かめてみて", note: null };
+    if(!res.ok){
+      let detail = "";
+      try{ detail = (await res.text()).slice(0, 200); }catch(e){}
+      return { result: "エラー: 絵筆が使えなかった（HTTP " + res.status + "）。⚙️のモデルIDと、" +
+               (refCount ? "画材（参考画像）入力に対応したモデルか" : "画像生成対応のモデルか") + "を確かめてみて" +
+               (detail ? "\n" + detail : ""), note: null };
+    }
     const j = await res.json();
     const msg = j.choices && j.choices[0] && j.choices[0].message;
     const url = msg && msg.images && msg.images[0] && msg.images[0].image_url && msg.images[0].image_url.url;
@@ -4653,6 +4693,111 @@ $("obobiAddBtn").onclick = () => {
 };
 $("obobiBtn").onclick = () => { renderObobi(); openPanel($("obobiPanel")); };
 
+/* ---------- v0.47 🎨 画材箱 ---------- */
+/* 参考画像は「くら」(IndexedDB kv) 住まい。キーは gazai:部屋id / gazai:shared */
+function gazaiKvKey(roomId){ return "gazai:" + (roomId || "shared"); }
+async function loadGazai(roomId){
+  try{ return (await kvGet(gazaiKvKey(roomId))) || { items: [] }; }
+  catch(e){ return { items: [] }; }
+}
+function saveGazai(roomId, box){ return kvPut(gazaiKvKey(roomId), box); }
+
+/* 絵筆に渡す画材を集める（部屋の箱＋みんなの棚。同じなまえは部屋が勝つ＝重ね着方式） */
+async function gatherGazai(roomId){
+  const own = (await loadGazai(roomId)).items || [];
+  const shared = (await loadGazai(null)).items || [];
+  const names = new Set(own.map(i => (i.name || "").trim()).filter(Boolean));
+  const merged = own.concat(shared.filter(i => {
+    const n = (i.name || "").trim();
+    return !n || !names.has(n);
+  }));
+  return merged.slice(0, 6); /* 送りすぎ防止の上限 */
+}
+
+let gazaiTarget = null; /* 画材の追加先: 部屋id か null(=みんなの棚) */
+function gazaiRow(roomId, it){
+  const row = document.createElement("div");
+  row.style.cssText = "display:flex;align-items:center;gap:10px;margin-bottom:10px";
+  const img = document.createElement("img");
+  img.src = it.dataUrl;
+  img.style.cssText = "width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid var(--line);flex:0 0 64px";
+  const name = document.createElement("input");
+  name.type = "text";
+  name.value = it.name || "";
+  name.placeholder = "例：リサの姿";
+  name.style.cssText = "flex:1;min-width:0";
+  name.onchange = async () => {
+    const box = await loadGazai(roomId);
+    const t = (box.items || []).find(x => x.id === it.id);
+    if(t){ t.name = name.value.trim(); await saveGazai(roomId, box); }
+  };
+  const delBtn = document.createElement("button");
+  delBtn.className = "iconbtn";
+  delBtn.textContent = "🗑";
+  delBtn.setAttribute("aria-label", "この画材を片付ける");
+  delBtn.onclick = async () => {
+    if(!confirm("この画材を片付けるよ。いい?")) return;
+    const box = await loadGazai(roomId);
+    box.items = (box.items || []).filter(x => x.id !== it.id);
+    await saveGazai(roomId, box);
+    renderGazai();
+  };
+  row.appendChild(img); row.appendChild(name); row.appendChild(delBtn);
+  return row;
+}
+async function renderGazai(){
+  if(!currentRoom) return;
+  $("gazaiRoomTitle").textContent = currentRoom.name + "の部屋の画材";
+  const roomBox = await loadGazai(currentRoom.id);
+  const sharedBox = await loadGazai(null);
+  const rl = $("gazaiRoomList"); rl.innerHTML = "";
+  if(!(roomBox.items || []).length) rl.innerHTML = '<p class="hint">まだ空っぽだよ。</p>';
+  else for(const it of roomBox.items) rl.appendChild(gazaiRow(currentRoom.id, it));
+  const sl = $("gazaiSharedList"); sl.innerHTML = "";
+  if(!(sharedBox.items || []).length) sl.innerHTML = '<p class="hint">まだ空っぽだよ。「リサの姿」をここに置くと、全部屋の絵筆で効くの。</p>';
+  else for(const it of sharedBox.items) sl.appendChild(gazaiRow(null, it));
+}
+function gazaiResize(file){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 1024; /* お手本用だから、このくらいで十分きれい */
+      let w = img.width, h = img.height;
+      const scale = Math.min(1, MAX / Math.max(w, h));
+      w = Math.round(w * scale); h = Math.round(h * scale);
+      const cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      cv.getContext("2d").drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(cv.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("read")); };
+    img.src = url;
+  });
+}
+$("gazaiRoomAddBtn").onclick = () => { if(!currentRoom) return; gazaiTarget = currentRoom.id; $("gazaiInput").click(); };
+$("gazaiSharedAddBtn").onclick = () => { gazaiTarget = null; $("gazaiInput").click(); };
+$("gazaiInput").addEventListener("change", async () => {
+  const files = [...($("gazaiInput").files || [])];
+  $("gazaiInput").value = "";
+  if(!files.length) return;
+  const box = await loadGazai(gazaiTarget);
+  let skipped = 0;
+  for(const f of files){
+    if(f.type && !/^image\//.test(f.type)){ skipped++; continue; }
+    try{
+      const dataUrl = await gazaiResize(f);
+      box.items = box.items || [];
+      box.items.push({ id: uid(), name: "", dataUrl, ts: Date.now() });
+    }catch(e){ skipped++; }
+  }
+  await saveGazai(gazaiTarget, box);
+  renderGazai();
+  if(skipped) alert(skipped + "枚は読み込めなかったみたい…画像ファイルか確かめてみて。");
+});
+$("gazaiBtn").onclick = () => { renderGazai(); openPanel($("gazaiPanel")); };
+
 /* ---------- v0.27 レターボックス ---------- */
 function collectOldLetters(){
   /* 保管箱ができる前に届いた手紙を、全スレッドから拾って箱に入れるよ */
@@ -5562,7 +5707,7 @@ $("saveProfileBtn").onclick = () => {
 
 $("deleteRoomBtn").onclick = () => {
   if(!currentRoom) return;
-  if(confirm("「" + currentRoom.name + "」の部屋と会話履歴・写真・記憶の棚・日記帳・あゆみ帳・アルバム帳を消すよ。本当にいい?")){
+  if(confirm("「" + currentRoom.name + "」の部屋と会話履歴・写真・記憶の棚・日記帳・あゆみ帳・アルバム帳・画材箱を消すよ。本当にいい?")){
     delRoomChats(currentRoom);
     del(avatarKey(currentRoom.id));
     del(bgKey(currentRoom.id));
@@ -5572,6 +5717,7 @@ $("deleteRoomBtn").onclick = () => {
     del(monoKey(currentRoom.id));
     del(letterKey(currentRoom.id));
     del(obobiKey(currentRoom.id));
+    kvDel(gazaiKvKey(currentRoom.id)).catch(()=>{});
     albumDeleteRoom(currentRoom.id).catch(()=>{});
     imgDeleteRoom(currentRoom.id).catch(()=>{});
     rooms = rooms.filter(r => r.id !== currentRoom.id);
@@ -6033,8 +6179,8 @@ $("exportAllBtn").onclick = exportAllMd;
 /* ---------- バックアップ ---------- */
 async function makeBackup(){
   const data = {
-    app: "oheya", version: 12, exportedAt: Date.now(),
-    rooms, chats: {}, shelves: {}, diaries: {}, ayumis: {}, monos: {}, letters: {}, obobis: {}, avatars: {}, bgs: {}, albums: [], chatimgs: []
+    app: "oheya", version: 13, exportedAt: Date.now(),
+    rooms, chats: {}, shelves: {}, diaries: {}, ayumis: {}, monos: {}, letters: {}, obobis: {}, avatars: {}, bgs: {}, gazais: {}, albums: [], chatimgs: []
   };
   for(const r of rooms){
     data.chats[r.id] = {};
@@ -6051,7 +6197,9 @@ async function makeBackup(){
     if(av) data.avatars[r.id] = av;
     const bg = loadRaw(bgKey(r.id));
     if(bg) data.bgs[r.id] = bg;
+    try{ const g = await loadGazai(r.id); if((g.items || []).length) data.gazais[r.id] = g; }catch(e){}
   }
+  try{ const g = await loadGazai(null); if((g.items || []).length) data.gazais.shared = g; }catch(e){}
   try{ data.albums = await albumAll(); }catch(e){ data.albums = []; }
   try{ data.chatimgs = await imgAll(); }catch(e){ data.chatimgs = []; }
   return data;
@@ -6182,6 +6330,17 @@ $("restoreInput").addEventListener("change", () => {
         }
       }
     }catch(e){ albumTrouble = true; }
+    /* 🎨 画材の復元（古いお守りにはgazaisが無いこともあるよ） */
+    try{
+      const kvKeys = await idbReq("kv", "readonly", st => st.getAllKeys()) || [];
+      for(const k of kvKeys){ if(typeof k === "string" && k.indexOf("gazai:") === 0) await kvDel(k); }
+      if(obj.gazais){
+        for(const rid of Object.keys(obj.gazais)){
+          const g = obj.gazais[rid];
+          if(g && Array.isArray(g.items) && g.items.length) await kvPut(rid === "shared" ? gazaiKvKey(null) : gazaiKvKey(rid), g);
+        }
+      }
+    }catch(e){}
     /* 復元したてはお守り（バックアップファイル）が手元にあるはずだから、日付をつけておくよ */
     global.lastBackupAt = Date.now();
     delete global.backupNudgeSnoozeUntil;
