@@ -1662,7 +1662,10 @@
         <button class="btn" id="notifTestBtn">📮 テスト通知</button>
       </div>
       <div class="credits" id="notifStatus" style="white-space:pre-line;margin-top:8px">確認中…</div>
-      <p class="hint">うちの子からロック画面にメッセージが届く機能の、土台づくりだよ。ホーム画面に追加した「おへや」から開いて、「🔔ゆるす」→「📮テスト通知」の順に押してみてね。</p>
+      <label for="pushWorkerUrl" style="margin-top:14px;display:block">⏰ 目覚まし係のURL（Cloudflare Worker）</label>
+      <input type="text" id="pushWorkerUrl" placeholder="https://oheya-mezamashi.〇〇.workers.dev" autocomplete="off">
+      <button class="btn" id="pushSubBtn" style="width:100%;margin-top:8px">📮 宛先札をあずける（この端末に通知が届くようにする）</button>
+      <p class="hint">うちの子からロック画面にメッセージが届く機能の、土台づくりだよ。ホーム画面に追加した「おへや」から開いて、「🔔ゆるす」→「📮テスト通知」の順に押してみてね。目覚まし係を用意したら、URLを入れて宛先札をあずけると、外からのノックで通知が届くようになるよ。</p>
     </div>
     <div class="field" style="margin-top:28px">
       <label>🖼 アイコン工房（じっけん中）</label>
@@ -1712,7 +1715,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.39 ─ おへやの顔は、うちの子。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.40 ─ とんとん、外からノックの音。</p>
   </div>
 </aside>
 
@@ -6202,6 +6205,15 @@ async function renderNotifStatus(){
     const p = Notification.permission;
     lines.push("🔔 通知: " + (p === "granted" ? "ゆるされてるよ" : p === "denied" ? "断られてる（iPhoneの設定→通知→おへや で変えられるよ）" : "まだ聞いてないよ"));
   }
+  try{
+    if("serviceWorker" in navigator && "PushManager" in window){
+      const reg = await navigator.serviceWorker.getRegistration();
+      const sub = reg ? await reg.pushManager.getSubscription() : null;
+      lines.push(sub ? "📮 宛先札: あずけ済み（外からのノックが届くよ）" : "📮 宛先札: まだあずけてないよ");
+    }
+  }catch(e){}
+  const wu = $("pushWorkerUrl");
+  if(wu && !wu.value && global.pushWorkerUrl) wu.value = global.pushWorkerUrl;
   box.textContent = lines.join("\n");
 }
 $("notifPermBtn").onclick = async () => {
@@ -6220,6 +6232,49 @@ $("notifTestBtn").onclick = async () => {
     box.textContent = "📮 テスト通知を送ったよ。画面の上にひょこっと出てきたら大成功！";
   }catch(e){
     box.textContent = "テスト通知でつまずいた…: " + (e && e.message ? e.message : e);
+  }
+};
+/* ---------- v0.40 📮 宛先札（プッシュ購読）と目覚まし係 ---------- */
+/* 通行証の公開鍵（目覚まし係のVAPID_PUBLICと同じもの） */
+const VAPID_PUBLIC = "BBheu7yRpkaOKu31c4bHgj0S375Jktuk1Z9QSlKaQUhQof48BL_IwEJDBNFJhl9hh0Fr9enBm6AnmSr7ZltN4nc";
+function urlB64ToU8(s){
+  s = s.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = s.length % 4 ? "====".slice(s.length % 4) : "";
+  const bin = atob(s + pad);
+  return Uint8Array.from(bin, c => c.charCodeAt(0));
+}
+$("pushSubBtn").onclick = async () => {
+  const box = $("notifStatus");
+  try{
+    const wurl = ($("pushWorkerUrl").value || "").trim().replace(/\/+$/, "");
+    if(!wurl){ box.textContent = "先に⏰目覚まし係のURLを入れてね"; return; }
+    if(!/^https:\/\//.test(wurl)){ box.textContent = "URLは https:// から始まるはずだよ"; return; }
+    global.pushWorkerUrl = wurl;
+    save(LS_GLOBAL, global);
+    if(!("Notification" in window) || Notification.permission !== "granted"){
+      box.textContent = "先に「🔔 通知をゆるす」を押してね"; return;
+    }
+    if(!("PushManager" in window)){
+      box.textContent = "この開き方ではプッシュが使えないみたい（ホーム画面版のおへやから試してね）"; return;
+    }
+    box.textContent = "宛先札を書いてるよ…";
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub){
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToU8(VAPID_PUBLIC)
+      });
+    }
+    const res = await fetch(wurl + "/subscribe", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(sub.toJSON())
+    });
+    if(!res.ok) throw new Error("目覚まし係に断られちゃった（HTTP " + res.status + "）");
+    box.textContent = "📮 宛先札をあずけたよ！これで外からのノックがこの端末に届くの";
+  }catch(e){
+    box.textContent = "宛先札あずけでつまずいた…: " + (e && e.message ? e.message : e);
   }
 };
 
