@@ -1665,6 +1665,30 @@
       <p class="hint">うちの子からロック画面にメッセージが届く機能の、土台づくりだよ。ホーム画面に追加した「おへや」から開いて、「🔔ゆるす」→「📮テスト通知」の順に押してみてね。</p>
     </div>
     <div class="field" style="margin-top:28px">
+      <label>🖼 アイコン工房（じっけん中）</label>
+      <input type="file" id="iconFile" accept="image/*" hidden>
+      <button class="btn" id="iconPickBtn" style="width:100%">🖼 画像をえらぶ</button>
+      <div id="iconStudio" style="display:none;margin-top:10px">
+        <canvas id="iconCanvas" width="512" height="512" style="width:180px;height:180px;border-radius:40px;border:1px solid var(--line);display:block;margin:0 auto"></canvas>
+        <div class="row" style="align-items:center;gap:10px;margin-top:10px">
+          <span class="hint" style="flex:0 0 5.5em">見える位置</span>
+          <input type="range" id="iconPos" min="0" max="100" value="50" style="flex:1">
+        </div>
+        <div class="row" style="align-items:center;gap:10px;margin-top:6px">
+          <span class="hint" style="flex:0 0 5.5em">背景の色</span>
+          <input type="color" id="iconBg" value="#ffffff" style="flex:0 0 48px;height:34px;border:none;background:none;padding:0">
+          <span class="hint" style="flex:1">画像の透明な部分はこの色で塗るよ（iPhoneのアイコンは透明が使えないの）</span>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn" id="iconDl180">⬇ 180</button>
+          <button class="btn" id="iconDl192">⬇ 192</button>
+          <button class="btn" id="iconDl512">⬇ 512</button>
+        </div>
+        <div class="credits" id="iconMsg" style="display:none;margin-top:8px"></div>
+      </div>
+      <p class="hint">好きな画像をおへやのアイコンに仕立てる工房だよ。書き出した3つのファイルを、GitHubのいつもの場所に同じ名前で上書きしてね。<b>反映にはホーム画面のおへやを一度削除→追加し直しが必要で、削除すると中のデータは消えちゃう</b>から、必ず先に💾お守りを保存して、追加し直したら📥復元してね。</p>
+    </div>
+    <div class="field" style="margin-top:28px">
       <label>🩺 画面の診断</label>
       <div class="credits" id="viewportDiag" style="white-space:pre-line">計測中…</div>
       <p class="hint">入力欄の下に空白ができる時など、画面の様子を調べるためのものだよ。この数字をフェイブルに見せてね。</p>
@@ -1688,7 +1712,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.38 ─ 留守番係、住みはじめました。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.39 ─ おへやの顔は、うちの子。</p>
   </div>
 </aside>
 
@@ -6198,6 +6222,74 @@ $("notifTestBtn").onclick = async () => {
     box.textContent = "テスト通知でつまずいた…: " + (e && e.message ? e.message : e);
   }
 };
+
+/* ---------- v0.39 🖼 アイコン工房 ---------- */
+/* 好きな画像を正方形に切り出して、アイコン用PNG（180/192/512）に仕立てるよ。
+   加工は全部この端末の中だけ。画像はどこにも送らない */
+const iconState = { img: null, pos: 0.5, bg: "#ffffff" };
+function drawIconPreview(){
+  const cv = $("iconCanvas");
+  if(!cv || !iconState.img) return;
+  const ctx = cv.getContext("2d");
+  const S = cv.width;
+  ctx.fillStyle = iconState.bg;
+  ctx.fillRect(0, 0, S, S);
+  const img = iconState.img;
+  const side = Math.min(img.naturalWidth, img.naturalHeight);
+  const sx = (img.naturalWidth  - side) * (img.naturalWidth  > img.naturalHeight ? iconState.pos : 0.5);
+  const sy = (img.naturalHeight - side) * (img.naturalHeight > img.naturalWidth  ? iconState.pos : 0.5);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, sx, sy, side, side, 0, 0, S, S);
+}
+function iconSay(msg){
+  const m = $("iconMsg");
+  m.style.display = "block";
+  m.textContent = msg;
+}
+$("iconPickBtn").onclick = () => $("iconFile").click();
+$("iconFile").onchange = () => {
+  const f = $("iconFile").files && $("iconFile").files[0];
+  if(!f) return;
+  const url = URL.createObjectURL(f);
+  const img = new Image();
+  img.onload = () => {
+    iconState.img = img;
+    $("iconStudio").style.display = "block";
+    drawIconPreview();
+    iconSay("いい画像だね。スライダーで見える位置を決めたら、3つとも書き出してね");
+  };
+  img.onerror = () => {
+    $("iconStudio").style.display = "block";
+    iconSay("この画像は読めなかった…。写真の形式によっては読めないことがあるから、その画像をスクリーンショットして、それを選び直すとうまくいくよ");
+  };
+  img.src = url;
+  $("iconFile").value = "";
+};
+$("iconPos").oninput = e => { iconState.pos = e.target.value / 100; drawIconPreview(); };
+$("iconBg").oninput = e => { iconState.bg = e.target.value; drawIconPreview(); };
+function downloadIcon(size, name){
+  if(!iconState.img){ iconSay("先に画像をえらんでね"); return; }
+  const out = document.createElement("canvas");
+  out.width = out.height = size;
+  const ctx = out.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage($("iconCanvas"), 0, 0, size, size);
+  out.toBlob(b => {
+    if(!b){ iconSay("書き出しに失敗しちゃった…もう一回試してみて"); return; }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(b);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    iconSay("⬇ " + name + " を書き出したよ（iPhoneならファイルAppの「ダウンロード」に入るよ）");
+  }, "image/png");
+}
+$("iconDl180").onclick = () => downloadIcon(180, "icon-180.png");
+$("iconDl192").onclick = () => downloadIcon(192, "icon-192.png");
+$("iconDl512").onclick = () => downloadIcon(512, "icon-512.png");
 
 /* ---------- 初期化 ---------- */
 renderLobby();
