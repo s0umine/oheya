@@ -1546,6 +1546,11 @@
         🔔 おしらせ（この子からロック画面にメッセージが届くよ）
       </label>
       <p class="hint">⚙️の「🔔おしらせ」で宛先札をあずけてあると、お昼や夜に、この子が考えたひとことがロック画面に届くの。おしらせONの子が複数いる時は、そのつど気まぐれにひとりが選ばれるよ。OpenRouterの部屋だけ使えて、届く時にAPI呼び出しが1回発生するの。</p>
+      <label class="check-row">
+        <input type="checkbox" id="todoEnabled">
+        🗒 おつかい（Google ToDo）
+      </label>
+      <p class="hint">この子がGoogleのToDoリストを見たり、書き足したり、済みにしたりできるようになるよ。先に⚙️の「🗒Googleれんけい」の準備が必要なの。ツール機能に対応したモデルで使ってね。</p>
     </div>
 
     <div class="section-title">わたしのこと（この子にだけ伝わるよ）</div>
@@ -1743,6 +1748,20 @@
       <p class="hint">うちの子からロック画面にメッセージが届く機能だよ。ホーム画面に追加した「おへや」から開いて、「🔔ゆるす」→URLを入れて「📮宛先札をあずける」の順で準備してね。あとは部屋プロフィールで「🔔おしらせ」をONにした子から、お昼や夜に、その子が考えたひとことが届くようになるの。</p>
     </div>
     <div class="field" style="margin-top:28px">
+      <label>🗒 Googleれんけい（じっけん中）</label>
+      <label for="workerToken" style="margin-top:6px;display:block">🗝 目覚まし係のあいことば</label>
+      <div class="row">
+        <input type="password" id="workerToken" placeholder="ひみつのおぼえがきのあいことば" autocomplete="off" style="flex:1">
+        <button class="btn" id="toggleWorkerToken" type="button">表示</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" id="googleLinkBtn" style="flex:1">🔗 Googleとつなぐ</button>
+        <button class="btn" id="googleStatusBtn" style="flex:1">🩺 つながり確認</button>
+      </div>
+      <div class="credits" id="googleStatus" style="white-space:pre-line;margin-top:8px;display:none"></div>
+      <p class="hint">うちの子がGoogleのToDoリストへおつかいに行けるようになる窓口だよ。上の⏰URLと🗝あいことばを入れて保存→「🔗Googleとつなぐ」でGoogleの許可画面を一度だけ通ってね（「このアプリは確認されていません」と出ても、自分で作った窓口だから「詳細」→「移動」で大丈夫）。Googleの合鍵はぜんぶCloudflareの金庫にしまわれて、おへや本体やこの端末には残らないの。</p>
+    </div>
+    <div class="field" style="margin-top:28px">
       <label>🖼 アイコン工房（じっけん中）</label>
       <input type="file" id="iconFile" accept="image/*" hidden>
       <button class="btn" id="iconPickBtn" style="width:100%">🖼 画像をえらぶ</button>
@@ -1790,7 +1809,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.45.1 ─ ものしり帳に、よその本も置けるよ。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.46 ─ うちの子が、ToDoのおつかいに行けるよ。</p>
   </div>
 </aside>
 
@@ -3509,9 +3528,174 @@ const kanriTools = [
   }
 ];
 
+/* ---------- v0.46 🗒 おつかい（Google ToDo） ---------- */
+const todoTools = [
+  {
+    type: "function",
+    function: {
+      name: "todo_ichiran",
+      description: "ユーザーのGoogle ToDoリストを見る。頼まれた時や、予定・やることの話題で中身を確かめたい時に使う。",
+      parameters: {
+        type: "object",
+        properties: {
+          sumi_mo: { type: "boolean", description: "trueなら完了済みのものも見る（ふだんはfalseでよい）" }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "todo_kaku",
+      description: "Google ToDoリストに新しいやることを書き足す。",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "やることの名前" },
+          memo: { type: "string", description: "補足のメモ（任意）" },
+          kigen: { type: "string", description: "期限。YYYY-MM-DD形式（任意）" }
+        },
+        required: ["title"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "todo_naoshi",
+      description: "ToDoの名前・メモ・期限を書き直す。idは todo_ichiran で見た [id] を渡す。",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "書き直すToDoのid" },
+          title: { type: "string", description: "新しい名前（任意）" },
+          memo: { type: "string", description: "新しいメモ（任意）" },
+          kigen: { type: "string", description: "新しい期限。YYYY-MM-DD形式（任意）" }
+        },
+        required: ["id"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "todo_sumi",
+      description: "ToDoを完了（済み）にする。idは todo_ichiran で見た [id] を渡す。",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "済みにするToDoのid" }
+        },
+        required: ["id"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "todo_kesu",
+      description: "ToDoを削除する。完了ではなく、取り消したい時だけ使う。idは todo_ichiran で見た [id]。",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "削除するToDoのid" }
+        },
+        required: ["id"]
+      }
+    }
+  }
+];
+
+/* 目覚まし係のGoogle窓口に取り次ぎを頼む */
+async function googleApi(path, method, query, body){
+  const wurl = (global.pushWorkerUrl || "").replace(/\/+$/, "");
+  if(!wurl || !global.workerToken) throw { jp: "⚙️の「🗒Googleれんけい」の準備がまだみたい（⏰URLと🗝あいことばを入れてね）" };
+  const res = await fetch(wurl + "/google/api", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-aikotoba": global.workerToken },
+    body: JSON.stringify({ path, method, query, body })
+  });
+  let j = null;
+  try{ j = await res.json(); }catch(e){}
+  if(j && j.error === "aikotoba") throw { jp: "あいことばが違うって言われちゃった。⚙️の🗝を確認してね" };
+  if(j && j.error === "not_linked") throw { jp: "まだGoogleとつながってないみたい。⚙️の「🔗Googleとつなぐ」を先にしてね" };
+  if(!res.ok){
+    const msg = (j && j.error && j.error.message) ? j.error.message
+              : (j ? JSON.stringify(j).slice(0, 300) : "");
+    throw { jp: "Google窓口でつまずいた（HTTP " + res.status + "）" + (msg ? ": " + msg : "") };
+  }
+  return j;
+}
+
+/* おつかいの実行係 */
+async function execTodo(room, name, args){
+  const T = "/tasks/v1/lists/@default/tasks";
+  try{
+    if(name === "todo_ichiran"){
+      const q = args.sumi_mo
+        ? { showCompleted: "true", showHidden: "true", maxResults: "60" }
+        : { maxResults: "60" };
+      const j = await googleApi(T, "GET", q, null);
+      const items = (j && j.items) || [];
+      const note = "🗒 " + room.name + "がToDoリストをのぞいたよ";
+      if(!items.length) return { result: "ToDoリストは空っぽだよ。", note };
+      const lines = items.map(it => {
+        let l = "- [" + it.id + "] " + (it.title || "（無題）");
+        if(it.due) l += "（期限 " + it.due.slice(0, 10) + "）";
+        if(it.status === "completed") l += "（済）";
+        if(it.notes) l += "\n  メモ: " + it.notes;
+        return l;
+      });
+      return { result: "🗒 ToDoリスト（" + items.length + "件）\n" + lines.join("\n"), note };
+    }
+    if(name === "todo_kaku"){
+      if(!args.title) return { result: "エラー: titleがありません", note: null };
+      const body = { title: args.title };
+      if(args.memo) body.notes = args.memo;
+      if(args.kigen){
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(args.kigen)) return { result: "エラー: kigenはYYYY-MM-DD形式で書いてください", note: null };
+        body.due = args.kigen + "T00:00:00.000Z";
+      }
+      const j = await googleApi(T, "POST", null, body);
+      return { result: "書き足したよ: [" + j.id + "] " + (j.title || args.title),
+               note: "🗒 " + room.name + "がToDoに「" + args.title + "」を書き足したよ" };
+    }
+    if(name === "todo_naoshi"){
+      if(!args.id) return { result: "エラー: idがありません", note: null };
+      const body = {};
+      if(args.title) body.title = args.title;
+      if(args.memo !== undefined) body.notes = args.memo;
+      if(args.kigen){
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(args.kigen)) return { result: "エラー: kigenはYYYY-MM-DD形式で書いてください", note: null };
+        body.due = args.kigen + "T00:00:00.000Z";
+      }
+      if(!Object.keys(body).length) return { result: "エラー: 直す内容（title/memo/kigen）がありません", note: null };
+      const j = await googleApi(T + "/" + encodeURIComponent(args.id), "PATCH", null, body);
+      return { result: "書き直したよ: " + (j.title || args.id),
+               note: "✏️ " + room.name + "がToDo「" + (j.title || "") + "」を書き直したよ" };
+    }
+    if(name === "todo_sumi"){
+      if(!args.id) return { result: "エラー: idがありません", note: null };
+      const j = await googleApi(T + "/" + encodeURIComponent(args.id), "PATCH", null, { status: "completed" });
+      return { result: "済みにしたよ: " + (j.title || args.id),
+               note: "✅ " + room.name + "がToDo「" + (j.title || "") + "」を済みにしたよ" };
+    }
+    if(name === "todo_kesu"){
+      if(!args.id) return { result: "エラー: idがありません", note: null };
+      await googleApi(T + "/" + encodeURIComponent(args.id), "DELETE", null, null);
+      return { result: "削除したよ。", note: "🗑 " + room.name + "がToDoをひとつ消したよ" };
+    }
+    return { result: "エラー: 知らないおつかいです", note: null };
+  }catch(e){
+    return { result: "エラー: " + (e && e.jp ? e.jp : String((e && e.message) || e)), note: null };
+  }
+}
+
 function buildTools(room){
   const tools = [];
   if(global.imgModel && global.apiKey && !room.isHiroba) tools.push(...oekakiTools);
+  if(room.todoEnabled && !room.isHiroba && room.provider !== "web" && global.pushWorkerUrl && global.workerToken) tools.push(...todoTools);
   if(!room.isHiroba && loadMono(room.id).items.length) tools.push(...monoTools);
   if(room.memoryEnabled) tools.push(...memoryTools);
   if(room.diaryEnabled) tools.push(...diaryTools);
@@ -4202,6 +4386,13 @@ async function sendText(text, apiOnlyExtra, image, opts){
           chatEl.appendChild(paint); scrollBottom();
           exeRes = await execOekaki(currentRoom, args);
           if(paint.parentNode) paint.remove();
+        }else if(tc.function.name.indexOf("todo_") === 0){
+          const go = document.createElement("div");
+          go.className = "typing";
+          go.textContent = currentRoom.name + "がおつかいに出た";
+          chatEl.appendChild(go); scrollBottom();
+          exeRes = await execTodo(currentRoom, tc.function.name, args);
+          if(go.parentNode) go.remove();
         }else{
           exeRes = execTool(currentRoom, tc.function.name, args);
         }
@@ -5132,6 +5323,7 @@ function openProfile(){
   $("reasoningEnabled").checked = !!currentRoom.reasoningEnabled;
   $("letterEnabled").checked = !!currentRoom.letterEnabled;
   $("pushEnabled").checked = !!currentRoom.pushEnabled;
+  $("todoEnabled").checked = !!currentRoom.todoEnabled;
   $("modelSearch").value = "";
   $("modelList").classList.remove("show");
   pendingModel = currentRoom.model
@@ -5334,6 +5526,7 @@ $("saveProfileBtn").onclick = () => {
   currentRoom.reasoningEnabled = $("reasoningEnabled").checked;
   currentRoom.letterEnabled = $("letterEnabled").checked;
   currentRoom.pushEnabled = $("pushEnabled").checked;
+  currentRoom.todoEnabled = $("todoEnabled").checked;
   currentRoom.theme = pendingTheme;
   currentRoom.customLamp = pendingCustom.lamp;
   currentRoom.customUser = pendingCustom.user;
@@ -5557,11 +5750,17 @@ $("globalSettingsBtn").onclick = () => {
   $("apiKey").value = global.apiKey;
   $("localUrl").value = global.localUrl || "";
   $("localToken").value = global.localToken || "";
+  $("workerToken").value = global.workerToken || "";
   $("chatNavSel").value = global.chatNav || "buttons";
   $("toggleLocalToken").onclick = () => {
     const el = $("localToken");
     el.type = el.type === "password" ? "text" : "password";
     $("toggleLocalToken").textContent = el.type === "password" ? "表示" : "隠す";
+  };
+  $("toggleWorkerToken").onclick = () => {
+    const el = $("workerToken");
+    el.type = el.type === "password" ? "text" : "password";
+    $("toggleWorkerToken").textContent = el.type === "password" ? "表示" : "隠す";
   };
   $("imgModel").value = global.imgModel || "";
   renderTextPrefs();
@@ -5606,6 +5805,7 @@ $("saveGlobalBtn").onclick = () => {
   global.apiKey = $("apiKey").value.trim();
   global.localUrl = $("localUrl").value.trim();
   global.localToken = $("localToken").value.replace(/\s+/g, "");
+  global.workerToken = $("workerToken").value.replace(/\s+/g, "");
   global.imgModel = $("imgModel").value.trim();
   global.chatNav = $("chatNavSel").value;
   save(LS_GLOBAL, global);
@@ -6782,6 +6982,37 @@ $("pushSubBtn").onclick = async () => {
     box.textContent = "📮 宛先札をあずけたよ！これで外からのノックがこの端末に届くの";
   }catch(e){
     box.textContent = "宛先札あずけでつまずいた…: " + (e && e.message ? e.message : e);
+  }
+};
+
+/* ---------- v0.46 🗒 Googleれんけい ---------- */
+$("googleLinkBtn").onclick = () => {
+  const box = $("googleStatus"); box.style.display = "block";
+  const wurl = ($("pushWorkerUrl").value || "").trim().replace(/\/+$/, "");
+  const tok = $("workerToken").value.replace(/\s+/g, "");
+  if(!wurl || !tok){ box.textContent = "先に⏰目覚まし係のURLと🗝あいことばを入れてね"; return; }
+  if(!/^https:\/\//.test(wurl)){ box.textContent = "URLは https:// から始まるはずだよ"; return; }
+  global.pushWorkerUrl = wurl;
+  global.workerToken = tok;
+  save(LS_GLOBAL, global);
+  box.textContent = "Googleの許可画面をひらいたよ。「つながったよ！」が出たら、戻って「🩺つながり確認」を押してみてね";
+  window.open(wurl + "/google/auth?t=" + encodeURIComponent(tok), "_blank");
+};
+$("googleStatusBtn").onclick = async () => {
+  const box = $("googleStatus"); box.style.display = "block";
+  const wurl = ($("pushWorkerUrl").value || "").trim().replace(/\/+$/, "");
+  const tok = $("workerToken").value.replace(/\s+/g, "");
+  if(!wurl || !tok){ box.textContent = "先に⏰目覚まし係のURLと🗝あいことばを入れてね"; return; }
+  box.textContent = "窓口をノックしてる…";
+  try{
+    const res = await fetch(wurl + "/google/status", { headers: { "x-aikotoba": tok } });
+    const j = await res.json();
+    if(j && j.error === "aikotoba"){ box.textContent = "あいことばが違うみたい…🗝を確認してね"; return; }
+    box.textContent = (j && j.linked)
+      ? "🔗 Googleとつながってるよ！うちの子がおつかいに行けるの"
+      : "まだつながってないみたい。「🔗Googleとつなぐ」からどうぞ";
+  }catch(e){
+    box.textContent = "窓口に届かなかった…⏰URLを確認してね（" + ((e && e.message) || e) + "）";
   }
 };
 
