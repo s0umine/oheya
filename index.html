@@ -1478,6 +1478,11 @@
         💌 お手紙（しばらくぶりに部屋を訪ねると、たまに手紙が届いているよ）
       </label>
       <p class="hint">6時間以上あいて部屋に入ると、半分くらいの確率でこの子からのお手紙が届くよ（1日1通まで）。届く時はAPI呼び出しが1回発生するの。</p>
+      <label class="check-row">
+        <input type="checkbox" id="pushEnabled">
+        🔔 おしらせ（この子からロック画面にメッセージが届くよ）
+      </label>
+      <p class="hint">⚙️の「🔔おしらせ」で宛先札をあずけてあると、お昼や夜に、この子が考えたひとことがロック画面に届くの。おしらせONの子が複数いる時は、そのつど気まぐれにひとりが選ばれるよ。OpenRouterの部屋だけ使えて、届く時にAPI呼び出しが1回発生するの。</p>
     </div>
 
     <div class="section-title">わたしのこと（この子にだけ伝わるよ）</div>
@@ -1665,7 +1670,7 @@
       <label for="pushWorkerUrl" style="margin-top:14px;display:block">⏰ 目覚まし係のURL（Cloudflare Worker）</label>
       <input type="text" id="pushWorkerUrl" placeholder="https://oheya-mezamashi.〇〇.workers.dev" autocomplete="off">
       <button class="btn" id="pushSubBtn" style="width:100%;margin-top:8px">📮 宛先札をあずける（この端末に通知が届くようにする）</button>
-      <p class="hint">うちの子からロック画面にメッセージが届く機能の、土台づくりだよ。ホーム画面に追加した「おへや」から開いて、「🔔ゆるす」→「📮テスト通知」の順に押してみてね。目覚まし係を用意したら、URLを入れて宛先札をあずけると、外からのノックで通知が届くようになるよ。</p>
+      <p class="hint">うちの子からロック画面にメッセージが届く機能だよ。ホーム画面に追加した「おへや」から開いて、「🔔ゆるす」→URLを入れて「📮宛先札をあずける」の順で準備してね。あとは部屋プロフィールで「🔔おしらせ」をONにした子から、お昼や夜に、その子が考えたひとことが届くようになるの。</p>
     </div>
     <div class="field" style="margin-top:28px">
       <label>🖼 アイコン工房（じっけん中）</label>
@@ -1715,7 +1720,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.40 ─ とんとん、外からノックの音。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.41 ─ ノックの音に、あの子の声が乗ったよ。</p>
   </div>
 </aside>
 
@@ -2162,6 +2167,7 @@ async function imgDeleteRoom(roomId){
 
 /* ---------- くらの読み書き（kvストア） ---------- */
 function kvPut(k, v){ return idbReq("kv", "readwrite", st => st.put(v, k)); }
+function kvGet(k){ return idbReq("kv", "readonly", st => st.get(k)); } /* 机を通さず、くらから直接読むよ（留守番係の置き手紙用） */
 function kvDel(k){ return idbReq("kv", "readwrite", st => st.delete(k)); }
 function kvClear(){ return idbReq("kv", "readwrite", st => st.clear()); }
 
@@ -2406,6 +2412,7 @@ function assistMetaLine(m, i){
   line.className = "amline";
   const bits = [];
   if(m.letter) bits.push("💌 おてがみ");
+  if(m.push) bits.push("🔔 おしらせ便");
   if(m.ts) bits.push(fmtTs(m.ts));
   if(m.model) bits.push(String(m.model).split("/").pop());
   if(m.usage){
@@ -4888,6 +4895,7 @@ function openProfile(){
   $("ayumiEnabled").checked = !!currentRoom.ayumiEnabled;
   $("reasoningEnabled").checked = !!currentRoom.reasoningEnabled;
   $("letterEnabled").checked = !!currentRoom.letterEnabled;
+  $("pushEnabled").checked = !!currentRoom.pushEnabled;
   $("modelSearch").value = "";
   $("modelList").classList.remove("show");
   pendingModel = currentRoom.model
@@ -5086,6 +5094,7 @@ $("saveProfileBtn").onclick = () => {
   currentRoom.ayumiEnabled = $("ayumiEnabled").checked;
   currentRoom.reasoningEnabled = $("reasoningEnabled").checked;
   currentRoom.letterEnabled = $("letterEnabled").checked;
+  currentRoom.pushEnabled = $("pushEnabled").checked;
   currentRoom.theme = pendingTheme;
   currentRoom.customLamp = pendingCustom.lamp;
   currentRoom.customUser = pendingCustom.user;
@@ -5093,6 +5102,7 @@ $("saveProfileBtn").onclick = () => {
   currentRoom.bgBlur = parseInt($("bgBlurRange").value, 10);
   if(pendingModel){ currentRoom.model = pendingModel.id; currentRoom.modelName = pendingModel.name; currentRoom.provider = pendingModel.provider || ""; }
   save(LS_ROOMS, rooms);
+  syncPushPack();
 
   if(pendingPhoto === null){
     del(avatarKey(currentRoom.id));
@@ -5356,6 +5366,7 @@ $("saveGlobalBtn").onclick = () => {
   global.localToken = $("localToken").value.replace(/\s+/g, "");
   global.imgModel = $("imgModel").value.trim();
   save(LS_GLOBAL, global);
+  syncPushPack();
   renderLobby();
   closePanels();
 };
@@ -6234,6 +6245,103 @@ $("notifTestBtn").onclick = async () => {
     box.textContent = "テスト通知でつまずいた…: " + (e && e.message ? e.message : e);
   }
 };
+/* ---------- v0.41 🔔 おしらせ便（第3歩：とんとんに中身が宿るよ） ----------
+   留守番係（sw.js）はたんす（localStorage）が読めないから、
+   必要なものだけ「しおり」としてくらに置いておくの。
+   届いたメッセージは留守番係が「おしらせ便ポスト」に入れて、
+   おへやが開いた時にここでその子の会話へ差し込むよ */
+const PUSH_PACK_KEY = "oheya_pushpack_v1";
+const PUSH_OPEN_KEY = "oheya_pushopen_v1";
+const pushMailKey = roomId => "oheya_pushmail_v1_" + roomId;
+
+/* しおり: APIキーと、おしらせONの子の横顔（人格・呼び名・いまの会話のとびら） */
+function syncPushPack(){
+  try{
+    const kids = rooms
+      .filter(r => r.pushEnabled && !r.isHiroba && !keyless(r) && r.model)
+      .map(r => ({
+        id: r.id, name: r.name, model: r.model,
+        sysPrompt: r.sysPrompt || "", userName: r.userName || "", userNote: r.userNote || "",
+        memoryEnabled: !!r.memoryEnabled,
+        threadId: r.activeThread || (latestThread(r) || {}).id || ""
+      }));
+    const pack = { v: 1, ts: Date.now(), apiKey: global.apiKey || "", rooms: kids };
+    kvPut(PUSH_PACK_KEY, JSON.stringify(pack)).catch(e => console.warn("しおりが置けなかった…", e));
+  }catch(e){ console.warn("しおり作りでつまずいた…", e); }
+}
+
+/* おしらせ便ポストを見て、届いた便をその子の会話へ差し込むよ */
+let pushMergeTimer = null;
+async function mergePushMail(){
+  try{
+    if(sending || omakaseRunning){
+      /* お話の途中に割り込まないの。少ししたらまた見に来るよ */
+      clearTimeout(pushMergeTimer);
+      pushMergeTimer = setTimeout(mergePushMail, 5000);
+      return;
+    }
+    let merged = false;
+    for(const room of rooms){
+      const key = pushMailKey(room.id);
+      const raw = await kvGet(key);
+      if(!raw) continue;
+      let items = [];
+      try{ items = JSON.parse(raw) || []; }catch(e){}
+      await kvDel(key);
+      memCache.delete(key);
+      if(!items.length) continue;
+      if(!Array.isArray(room.threads)) room.threads = [];
+      let t = room.activeThread ? room.threads.find(x => x.id === room.activeThread) : null;
+      if(!t) t = latestThread(room);
+      if(!t) t = newThread(room);
+      const tk = threadKey(room.id, t.id);
+      const inHere = (currentRoom === room && currentThread === t);
+      const arr = inHere ? chat : (load(tk) || []);
+      for(const it of items){
+        if(!it || typeof it.content !== "string" || !it.content) continue;
+        arr.push({ role: "assistant", content: it.content, ts: it.ts || Date.now(), model: it.model || room.model, push: true });
+      }
+      save(tk, arr);
+      t.updatedAt = Date.now();
+      merged = true;
+      if(inHere){ renderChat(); scrollBottom(); }
+    }
+    if(merged){ save(LS_ROOMS, rooms); renderLobby(); }
+  }catch(e){ console.warn("おしらせ便の受け取りでつまずいた…", e); }
+}
+
+/* 通知タップの呼び鈴が鳴っていたら、その子の部屋へ */
+async function checkPushOpen(){
+  try{
+    const raw = await kvGet(PUSH_OPEN_KEY);
+    if(!raw) return;
+    await kvDel(PUSH_OPEN_KEY);
+    memCache.delete(PUSH_OPEN_KEY);
+    let o = null;
+    try{ o = JSON.parse(raw); }catch(e){}
+    if(!o || !o.roomId) return;
+    if(o.ts && (Date.now() - o.ts) > 30 * 60000) return; /* 古い呼び鈴は鳴らさないよ */
+    if(rooms.some(r => r.id === o.roomId)) openRoom(o.roomId);
+  }catch(e){}
+}
+
+/* 留守番係からのささやき（おへやが起きている間に便が届いた時） */
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.addEventListener("message", (ev) => {
+    const d = ev.data || {};
+    if(d.type === "oheya-pushmail"){ mergePushMail(); }
+    if(d.type === "oheya-pushopen"){
+      mergePushMail().then(() => { if(d.roomId && rooms.some(r => r.id === d.roomId)) openRoom(d.roomId); });
+    }
+  });
+}
+/* バックグラウンドから戻ってきた時も、ポストをのぞくよ */
+document.addEventListener("visibilitychange", () => {
+  if(document.visibilityState === "visible"){
+    mergePushMail().then(checkPushOpen);
+  }
+});
+
 /* ---------- v0.40 📮 宛先札（プッシュ購読）と目覚まし係 ---------- */
 /* 通行証の公開鍵（目覚まし係のVAPID_PUBLICと同じもの） */
 const VAPID_PUBLIC = "BBheu7yRpkaOKu31c4bHgj0S375Jktuk1Z9QSlKaQUhQof48BL_IwEJDBNFJhl9hh0Fr9enBm6AnmSr7ZltN4nc";
@@ -6348,6 +6456,9 @@ $("iconDl512").onclick = () => downloadIcon(512, "icon-512.png");
 
 /* ---------- 初期化 ---------- */
 renderLobby();
+/* おしらせ便まわり: しおりを置き直して、ポストと呼び鈴を確認するよ */
+syncPushPack();
+mergePushMail().then(checkPushOpen);
 
 /* デバッグの窓：困ったときにフェイブルが中を覗くためのもの。ふだんは触らなくて大丈夫 */
 window.__oheya = { load, save, del, loadRaw, saveRaw, memCache, makeBackup, flushWrites, applyWorldTheme, openRoom, kvClear, backupNudgeState, renderBackupNudge, doBackup, renderLobby, get global(){ return global; }, get rooms(){ return rooms; } };
