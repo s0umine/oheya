@@ -486,11 +486,17 @@
   #chatBg{
     position:absolute;inset:0;z-index:0;display:none;
     background-size:cover;background-position:center;
+    opacity:var(--bgfade,1);
   }
   #roomScreen.has-bg #chatBg{display:block}
   #roomScreen.has-bg > header,
+  #roomScreen.has-bg > #threadBar,
   #roomScreen.has-bg > #chat,
   #roomScreen.has-bg > footer{position:relative;z-index:1}
+  #roomScreen.has-bg > #threadBar{
+    background:color-mix(in srgb, var(--surface) 72%, transparent);
+    -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  }
   #roomScreen.has-bg .msg.assistant{
     background:var(--paper);
     background:color-mix(in srgb, var(--paper) var(--bgmix,68%), transparent);
@@ -1459,6 +1465,10 @@
         <button class="btn" id="bgRemoveBtn">はずす</button>
       </div>
       <div class="bg-sliders" id="bgSliders" style="display:none">
+        <label>壁紙の濃さ
+          <input type="range" id="bgFadeRange" min="15" max="100" step="5">
+          <span class="bg-val" id="bgFadeVal"></span>
+        </label>
         <label>ふきだしの濃さ
           <input type="range" id="bgMixRange" min="30" max="100" step="5">
           <span class="bg-val" id="bgMixVal"></span>
@@ -1469,7 +1479,7 @@
         </label>
       </div>
       <input type="file" id="bgInput" accept="image/*" hidden>
-      <p class="hint">部屋の背景に写真を飾れるよ。ふきだしはうっすら透けて、すりガラスごしに壁紙が見えるの。濃さを下げるほど透けて、くもり0だと素通しのうっすら透過になるよ。保存してから部屋で確かめてね。</p>
+      <p class="hint">部屋の背景に写真を飾れるよ。「壁紙の濃さ」を下げると、壁紙が部屋の地の色にすうっと沈んでうすくなるの。ふきだしはうっすら透けて、すりガラスごしに壁紙が見えるよ。保存してから部屋で確かめてね。</p>
     </div>
     <div class="field">
       <label for="modelSearch">モデル</label>
@@ -1779,7 +1789,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.43 ─ お話は、枝分かれして育つ。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.43.1 ─ とびらは壁紙の上に、壁紙は好みの濃さに。</p>
   </div>
 </aside>
 
@@ -2128,6 +2138,7 @@ function applyRoomBg(room){
   const bg = room ? loadRaw(bgKey(room.id)) : null;
   if(bg){
     layer.style.backgroundImage = 'url("' + bg + '")';
+    scr.style.setProperty("--bgfade", String((room.bgFade == null ? 100 : room.bgFade) / 100));
     scr.style.setProperty("--bgmix", (room.bgMix == null ? 68 : room.bgMix) + "%");
     scr.style.setProperty("--bgblur", (room.bgBlur == null ? 10 : room.bgBlur) + "px");
     scr.classList.add("has-bg");
@@ -2485,7 +2496,7 @@ function assistMetaLine(m, i){
     line.appendChild(info);
   }
   line.appendChild(miniBtn("⧉", "この発言をコピー", e => copyToClip(m.content, e.currentTarget)));
-  line.appendChild(miniBtn("🌿", "ここから分岐して新しい会話へ", () => branchFromMessage(i)));
+  line.appendChild(miniBtn("⤨", "ここから分岐して新しい会話へ", () => branchFromMessage(i)));
   if(i === lastAssistantIndex()){
     line.appendChild(miniBtn("↻", "もう一度考えてもらう", () => regenLast()));
   }
@@ -5011,11 +5022,14 @@ function renderBgField(){
     pv.textContent = "タップして壁紙をえらぶ";
   }
   $("bgSliders").style.display = bg ? "flex" : "none";
+  const fade = currentRoom && currentRoom.bgFade != null ? currentRoom.bgFade : 100;
   const mix = currentRoom && currentRoom.bgMix != null ? currentRoom.bgMix : 68;
   const blur = currentRoom && currentRoom.bgBlur != null ? currentRoom.bgBlur : 10;
+  $("bgFadeRange").value = fade; $("bgFadeVal").textContent = fade + "%";
   $("bgMixRange").value = mix;  $("bgMixVal").textContent = mix + "%";
   $("bgBlurRange").value = blur; $("bgBlurVal").textContent = blur + "px";
 }
+$("bgFadeRange").oninput = () => { $("bgFadeVal").textContent = $("bgFadeRange").value + "%"; };
 $("bgMixRange").oninput = () => { $("bgMixVal").textContent = $("bgMixRange").value + "%"; };
 $("bgBlurRange").oninput = () => { $("bgBlurVal").textContent = $("bgBlurRange").value + "px"; };
 $("bgPreview").onclick = () => $("bgInput").click();
@@ -5158,6 +5172,7 @@ $("saveProfileBtn").onclick = () => {
   currentRoom.theme = pendingTheme;
   currentRoom.customLamp = pendingCustom.lamp;
   currentRoom.customUser = pendingCustom.user;
+  currentRoom.bgFade = parseInt($("bgFadeRange").value, 10);
   currentRoom.bgMix = parseInt($("bgMixRange").value, 10);
   currentRoom.bgBlur = parseInt($("bgBlurRange").value, 10);
   if(pendingModel){ currentRoom.model = pendingModel.id; currentRoom.modelName = pendingModel.name; currentRoom.provider = pendingModel.provider || ""; }
