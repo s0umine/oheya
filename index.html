@@ -324,6 +324,29 @@
     padding:18px 14px 10px;
     display:flex;flex-direction:column;gap:14px;
   }
+  /* ---------- v0.42 🧭 ながい会話のナビ ---------- */
+  #navBtns{position:absolute;right:12px;z-index:5;display:flex;flex-direction:column;gap:8px}
+  #navBtns button{
+    width:40px;height:40px;border-radius:50%;border:1px solid rgba(0,0,0,.1);
+    background:var(--paper);color:var(--ink);font-size:16px;line-height:1;
+    box-shadow:0 2px 8px rgba(0,0,0,.25);opacity:0;pointer-events:none;
+    transition:opacity .25s;cursor:pointer;padding:0;
+  }
+  #navBtns button.show{opacity:.88;pointer-events:auto}
+  #navBar{position:absolute;right:0;width:26px;z-index:5;touch-action:none}
+  #navTrack{position:absolute;top:0;bottom:0;right:9px;width:4px;border-radius:2px;background:rgba(128,128,128,.28)}
+  #navHandle{
+    position:absolute;top:0;right:-6px;width:16px;height:36px;border-radius:8px;
+    background:var(--paper);border:1px solid rgba(0,0,0,.15);
+    box-shadow:0 1px 5px rgba(0,0,0,.3);
+  }
+  #navBar.drag #navHandle{width:20px;right:-8px}
+  #navBubble{
+    position:absolute;right:28px;transform:translateY(-50%);
+    background:var(--paper);color:var(--ink);border-radius:8px;
+    padding:4px 10px;font-size:12px;white-space:nowrap;
+    box-shadow:0 2px 8px rgba(0,0,0,.3);pointer-events:none;
+  }
   .arow{display:flex;flex-direction:column;gap:6px;max-width:92%;align-self:flex-start;width:92%}
   .msg{line-height:var(--msglh,1.75);font-size:var(--msgfs,15px);white-space:pre-wrap;word-break:break-word;min-width:0}
   .msg.assistant{
@@ -1338,6 +1361,14 @@
     🧵 <span id="threadName"></span><span class="tchev">▾</span>
   </button>
   <main id="chat" aria-live="polite"></main>
+  <div id="navBtns" hidden>
+    <button id="navTopBtn" title="いちばん上へ" aria-label="いちばん上へ">⬆</button>
+    <button id="navBottomBtn" title="いちばん下へ" aria-label="いちばん下へ">⬇</button>
+  </div>
+  <div id="navBar" hidden>
+    <div id="navTrack"><div id="navHandle"></div></div>
+    <div id="navBubble" hidden></div>
+  </div>
   <footer>
     <div id="speakerBar" hidden></div>
     <div id="attachChip" hidden>
@@ -1617,6 +1648,13 @@
       <button class="btn" id="imgModelsBtn" style="width:100%;margin-top:8px">🎨 お絵かきできるモデルをさがす</button>
       <div id="imgModelList"></div>
       <p class="hint">OpenRouterの画像生成対応モデルを設定すると、うちの子たちが自分の意思で絵を描けるようになるよ（空にするとオフ）。描いた絵はチャットに飾られて、その部屋のアルバム帳にも保存されるよ。</p>
+      <label for="chatNavSel" style="margin-top:18px;display:block">🧭 ながい会話の移動（チャットのナビ）</label>
+      <select id="chatNavSel" style="width:100%">
+        <option value="buttons">↕ とびボタン（最上部・最下部へひとっとび）</option>
+        <option value="bar">📏 右端の移動バー（つまんで好きな場所へ）</option>
+        <option value="none">なし</option>
+      </select>
+      <p class="hint">ながくなった会話の中を移動しやすくする道具だよ。移動バーは、つまんで動かしている間「いつごろの会話か」もささやいてくれるの。</p>
       <div class="credits" id="credits" style="display:none"></div>
       <div class="row" style="margin-top:8px">
         <button class="btn" id="checkCredits">💰 残高を確認</button>
@@ -1720,7 +1758,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.41 ─ ノックの音に、あの子の声が乗ったよ。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.42 ─ ながいお話も、ひとっとび。</p>
   </div>
 </aside>
 
@@ -5316,6 +5354,7 @@ $("globalSettingsBtn").onclick = () => {
   $("apiKey").value = global.apiKey;
   $("localUrl").value = global.localUrl || "";
   $("localToken").value = global.localToken || "";
+  $("chatNavSel").value = global.chatNav || "buttons";
   $("toggleLocalToken").onclick = () => {
     const el = $("localToken");
     el.type = el.type === "password" ? "text" : "password";
@@ -5365,8 +5404,10 @@ $("saveGlobalBtn").onclick = () => {
   global.localUrl = $("localUrl").value.trim();
   global.localToken = $("localToken").value.replace(/\s+/g, "");
   global.imgModel = $("imgModel").value.trim();
+  global.chatNav = $("chatNavSel").value;
   save(LS_GLOBAL, global);
   syncPushPack();
+  applyChatNav();
   renderLobby();
   closePanels();
 };
@@ -6245,6 +6286,110 @@ $("notifTestBtn").onclick = async () => {
     box.textContent = "テスト通知でつまずいた…: " + (e && e.message ? e.message : e);
   }
 };
+/* ---------- v0.42 🧭 ながい会話のナビ ----------
+   ながくなった会話の中をひとっとびで移動する道具。
+   「↕とびボタン」と「📏右端の移動バー」を⚙️で選べるよ。
+   移動バーは、つまんで動かしている間「いつごろの会話か」をささやくの */
+const navBtnsEl = $("navBtns"), navBarEl = $("navBar"), navTrackEl = $("navTrack"),
+      navHandleEl = $("navHandle"), navBubbleEl = $("navBubble"),
+      navTopBtn = $("navTopBtn"), navBottomBtn = $("navBottomBtn");
+function navMode(){ return global.chatNav || "buttons"; }
+function applyChatNav(){
+  const m = navMode();
+  navBtnsEl.hidden = (m !== "buttons");
+  navBarEl.hidden = (m !== "bar");
+  positionNav();
+  updateNav();
+}
+/* チャット欄のいまの背丈に合わせて、道具の位置を整えるよ */
+function positionNav(){
+  const top = chatEl.offsetTop, h = chatEl.offsetHeight;
+  navBarEl.style.top = (top + 6) + "px";
+  navBarEl.style.height = Math.max(0, h - 12) + "px";
+  const scr = $("roomScreen");
+  navBtnsEl.style.bottom = (Math.max(0, scr.offsetHeight - (top + h)) + 12) + "px";
+}
+function updateNav(){
+  const m = navMode();
+  const max = chatEl.scrollHeight - chatEl.clientHeight;
+  if(m === "buttons"){
+    navTopBtn.classList.toggle("show", chatEl.scrollTop > 260);
+    navBottomBtn.classList.toggle("show", (max - chatEl.scrollTop) > 260);
+  }else if(m === "bar"){
+    const can = max > 60;
+    navTrackEl.style.display = can ? "" : "none";
+    if(can && !navBarEl.hidden){
+      const trackH = navTrackEl.offsetHeight, hh = navHandleEl.offsetHeight;
+      const ratio = max > 0 ? (chatEl.scrollTop / max) : 0;
+      navHandleEl.style.top = (ratio * Math.max(0, trackH - hh)) + "px";
+    }
+  }
+}
+navTopBtn.onclick = () => chatEl.scrollTo({ top: 0, behavior: "smooth" });
+navBottomBtn.onclick = () => chatEl.scrollTo({ top: chatEl.scrollHeight, behavior: "smooth" });
+
+/* 移動バー: つまんで、好きな時間へ */
+let navKids = null;
+function navSnapshot(){
+  const base = chatEl.offsetTop;
+  navKids = [...chatEl.children].map(el => ({ top: el.offsetTop - base, el }));
+}
+function navDateAt(y){
+  if(!navKids) return "";
+  let row = null;
+  for(const k of navKids){ if(k.top <= y) row = k.el; else break; }
+  let steps = 0;
+  while(row && steps++ < 40){
+    const am = row.querySelector ? row.querySelector(".amline") : null;
+    if(am){
+      const mt = (am.textContent || "").match(/\d{1,2}\/\d{1,2}/);
+      if(mt) return mt[0];
+    }
+    row = row.previousElementSibling;
+  }
+  return "";
+}
+function navDragTo(clientY){
+  const rect = navTrackEl.getBoundingClientRect();
+  const hh = navHandleEl.offsetHeight;
+  const r = Math.min(1, Math.max(0, (clientY - rect.top - hh / 2) / Math.max(1, rect.height - hh)));
+  const max = chatEl.scrollHeight - chatEl.clientHeight;
+  chatEl.scrollTop = r * max;
+  const d = navDateAt(chatEl.scrollTop + chatEl.clientHeight / 2);
+  navBubbleEl.hidden = !d;
+  if(d) navBubbleEl.textContent = "🧵 " + d + " ごろ";
+  navBubbleEl.style.top = ((r * Math.max(0, navTrackEl.offsetHeight - hh)) + hh / 2 + 6) + "px";
+}
+navBarEl.addEventListener("pointerdown", (e) => {
+  if(navMode() !== "bar") return;
+  e.preventDefault();
+  navBarEl.classList.add("drag");
+  try{ navBarEl.setPointerCapture(e.pointerId); }catch(err){}
+  navSnapshot();
+  navDragTo(e.clientY);
+});
+navBarEl.addEventListener("pointermove", (e) => {
+  if(!navBarEl.classList.contains("drag")) return;
+  navDragTo(e.clientY);
+});
+function navDragEnd(){
+  if(!navBarEl.classList.contains("drag")) return;
+  navBarEl.classList.remove("drag");
+  navKids = null;
+  setTimeout(() => { navBubbleEl.hidden = true; }, 700);
+}
+navBarEl.addEventListener("pointerup", navDragEnd);
+navBarEl.addEventListener("pointercancel", navDragEnd);
+
+/* スクロール・模様替え・会話の増減に合わせて、そっとついていくよ */
+chatEl.addEventListener("scroll", updateNav, { passive: true });
+new ResizeObserver(() => { positionNav(); updateNav(); }).observe(chatEl);
+let navMoTimer = null;
+new MutationObserver(() => {
+  clearTimeout(navMoTimer);
+  navMoTimer = setTimeout(updateNav, 120);
+}).observe(chatEl, { childList: true, subtree: true });
+
 /* ---------- v0.41 🔔 おしらせ便（第3歩：とんとんに中身が宿るよ） ----------
    留守番係（sw.js）はたんす（localStorage）が読めないから、
    必要なものだけ「しおり」としてくらに置いておくの。
@@ -6456,6 +6601,7 @@ $("iconDl512").onclick = () => downloadIcon(512, "icon-512.png");
 
 /* ---------- 初期化 ---------- */
 renderLobby();
+applyChatNav();
 /* おしらせ便まわり: しおりを置き直して、ポストと呼び鈴を確認するよ */
 syncPushPack();
 mergePushMail().then(checkPushOpen);
