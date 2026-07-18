@@ -1779,7 +1779,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.42.1 ─ ながいお話も、ひとっとび。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.43 ─ お話は、枝分かれして育つ。</p>
   </div>
 </aside>
 
@@ -2485,6 +2485,7 @@ function assistMetaLine(m, i){
     line.appendChild(info);
   }
   line.appendChild(miniBtn("⧉", "この発言をコピー", e => copyToClip(m.content, e.currentTarget)));
+  line.appendChild(miniBtn("🌿", "ここから分岐して新しい会話へ", () => branchFromMessage(i)));
   if(i === lastAssistantIndex()){
     line.appendChild(miniBtn("↻", "もう一度考えてもらう", () => regenLast()));
   }
@@ -6307,6 +6308,50 @@ $("notifTestBtn").onclick = async () => {
     box.textContent = "テスト通知でつまずいた…: " + (e && e.message ? e.message : e);
   }
 };
+/* ---------- v0.43 🌿 会話の分岐 ----------
+   「この回答まで」のお話を写し取って、新しいとびらを作るよ。
+   ここから先は、元の会話と分かれて別々の物語になるの。
+   写す時、絵は新しい写しを作るよ（どちらの会話を消しても、
+   もう片方の絵が欠けないように） */
+async function branchFromMessage(i){
+  if(!currentRoom || !currentThread) return;
+  if(sending || omakaseRunning){ addError("お話の途中は分岐できないの。お返事が終わってからね。"); return; }
+  if(!chat[i]) return;
+  const src = currentThread;
+  if(!confirm("ここまでのお話を写して、新しい会話に分岐するよ。ここから先は、元の会話とは別々の物語になるの。いい?")) return;
+  try{
+    /* ここまでを写し取る */
+    const copies = JSON.parse(JSON.stringify(chat.slice(0, i + 1)));
+    /* 絵の写しも作るよ */
+    for(const m of copies){
+      if(!m.imgId) continue;
+      try{
+        const rec = await imgGet(m.imgId);
+        if(rec){
+          const nid = uid();
+          await imgPut(Object.assign({}, rec, { id: nid }));
+          m.imgId = nid;
+        }
+      }catch(e){}
+    }
+    /* 新しいとびらを立てるよ（🌿の印つき。名前は自動で変わらないの） */
+    const t = {
+      id: uid(),
+      title: "🌿 " + (src.title || threadDateTitle()),
+      createdAt: Date.now(), updatedAt: Date.now(),
+      auto: false,
+      branchOf: src.id
+    };
+    if(Array.isArray(src.members)) t.members = [...src.members]; /* 広間なら顔ぶれもそのまま */
+    currentRoom.threads.push(t);
+    save(threadKey(currentRoom.id, t.id), copies);
+    save(LS_ROOMS, rooms);
+    openRoom(currentRoom.id, t.id);
+  }catch(e){
+    addError("分岐でつまずいちゃった…: " + (e && e.message ? e.message : e));
+  }
+}
+
 /* ---------- v0.42 🧭 ながい会話のナビ ----------
    ながくなった会話の中をひとっとびで移動する道具。
    「↕とびボタン」と「📏右端の移動バー」を⚙️で選べるよ。
