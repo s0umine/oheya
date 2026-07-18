@@ -1,4 +1,4 @@
-/* おへやの留守番係（サービスワーカー）v0.41
+/* おへやの留守番係（サービスワーカー）v0.44
    お仕事:
    ① 目覚まし係からの「とんとん」（空のプッシュ）で目を覚ます
    ② くらに置いてある「しおり」を読んで、おしらせONの子をひとり選ぶ
@@ -61,8 +61,16 @@ async function handleKnock(){
       return;
     }
 
-    /* 今回おしゃべりする子を、気まぐれに選ぶよ */
-    room = pack.rooms[Math.floor(Math.random() * pack.rooms.length)];
+    /* 今回おしゃべりする子を選ぶよ。
+       きょうがおぼえ日（記念日）の子がいたら、その子を優先するの */
+    const now0 = new Date();
+    const withDay = pack.rooms.filter(r => Array.isArray(r.obobi) &&
+      r.obobi.some(o => o.month === now0.getMonth() + 1 && o.day === now0.getDate()));
+    const pool = withDay.length ? withDay : pack.rooms;
+    room = pool[Math.floor(Math.random() * pool.length)];
+    /* きょうのおぼえ日（この子のぶん） */
+    const todays = (room.obobi || []).filter(o => o.month === now0.getMonth() + 1 && o.day === now0.getDate())
+      .map(o => ({ ...o, yrs: (o.year && o.year <= now0.getFullYear()) ? (now0.getFullYear() - o.year) : null }));
 
     /* その子の記憶の棚と、最近の会話のしっぽを、くらから直接読む（いつも最新） */
     const shelf = parseJSON(await kvGet("oheya_shelf_v2_" + room.id)) || { items: [] };
@@ -99,6 +107,12 @@ async function handleKnock(){
       "- あいさつ、気づかい、ふと思ったこと、最近の話題の続きなど、内容はあなたの自由に。\n" +
       "- 返事や会話の続きを急かさないこと。\n" +
       "- メッセージの本文だけを書いてください（前置きや説明は書かない）。";
+    if(todays.length){
+      sys += "\n\n# きょうはおぼえ日\n" +
+        "今日は" + (now0.getMonth() + 1) + "月" + now0.getDate() + "日、" +
+        todays.map(t => "「" + t.title + "」の日" + (t.yrs ? "（" + t.yrs + "周年）" : "") + (t.note ? "（" + t.note + "）" : "")).join("、") +
+        "です。このメッセージでは、その日であることに、あなたらしくふれてください。";
+    }
 
     const userMsg = (tail ? "（最近のやりとりの切れはし）\n" + tail + "\n" : "（まだ会話の記録は手元にありません）\n") +
       "（ここまで。さあ、ロック画面へのひとことをどうぞ）";

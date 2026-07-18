@@ -1379,6 +1379,7 @@
     <button class="menu-item" id="letterBoxBtn">💌 レターボックス</button>
     <button class="menu-item" id="monoBtn">📖 ものしり帳</button>
     <button class="menu-item" id="ayumiBtn">📜 あゆみ帳</button>
+    <button class="menu-item" id="obobiBtn">📅 おぼえ日帳</button>
     <button class="menu-item" id="omiyageBtn" hidden>🎁 みんなでおみやげを書く</button>
     <button class="menu-item" id="newBtn">🧵 新しい会話をはじめる</button>
     <button class="menu-item" id="exportBtn">📄 この会話をMarkdownで保存</button>
@@ -1789,7 +1790,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.43.1 ─ とびらは壁紙の上に、壁紙は好みの濃さに。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.44 ─ たいせつな日は、ちゃんと覚えてる。</p>
   </div>
 </aside>
 
@@ -1840,6 +1841,21 @@
     </p>
     <div id="monoList"></div>
     <button class="btn" id="monoAddBtn" style="width:100%">＋ 新しいページを書く</button>
+  </div>
+</aside>
+
+<!-- ========== おぼえ日帳 ========== -->
+<aside class="panel" id="obobiPanel" aria-label="おぼえ日帳">
+  <div class="panel-head">
+    <h2>📅 おぼえ日帳</h2>
+    <button class="iconbtn" data-close aria-label="閉じる">✕</button>
+  </div>
+  <div class="panel-body">
+    <p class="hint" style="margin-bottom:14px">
+      この子との記念日を書いておく帳面だよ。お迎え記念日、誕生日、なんでもない大切な日……。書いておくと、この子はその日をちゃんと覚えていて、当日の会話でふれてくれるの。🔔おしらせがONなら、当日の通知はその子が優先で届けに来るよ。年を書いておくと「〇周年」も数えてくれるの。
+    </p>
+    <div id="obobiList"></div>
+    <button class="btn" id="obobiAddBtn" style="width:100%">＋ 新しいおぼえ日を書く</button>
   </div>
 </aside>
 
@@ -2165,6 +2181,23 @@ function saveMono(roomId, mono){ return save(monoKey(roomId), mono); }
 /* ---------- あゆみ帳データ ---------- */
 function loadAyumi(roomId){ return load(ayumiKey(roomId)) || { nextId: 1, items: [] }; }
 function saveAyumi(roomId, ayumi){ return save(ayumiKey(roomId), ayumi); }
+
+/* ---------- おぼえ日帳データ（部屋ごとの記念日） ---------- */
+function obobiKey(roomId){ return "oheya_obobi_" + roomId; }
+function loadObobi(roomId){ return load(obobiKey(roomId)) || { nextId: 1, items: [] }; }
+function saveObobi(roomId, box){ return save(obobiKey(roomId), box); }
+/* 今日にあたるおぼえ日を返すよ（周年も数えるの） */
+function todayObobi(roomId, now){
+  const d = now || new Date();
+  const out = [];
+  for(const it of loadObobi(roomId).items){
+    if(it.month === (d.getMonth() + 1) && it.day === d.getDate()){
+      const yrs = (it.year && it.year <= d.getFullYear()) ? (d.getFullYear() - it.year) : null;
+      out.push({ ...it, yrs });
+    }
+  }
+  return out;
+}
 
 /* ---------- 日記帳データ ---------- */
 function loadDiary(roomId){ return load(diaryKey(roomId)) || { nextId: 1, items: [] }; }
@@ -3183,6 +3216,22 @@ function buildSystem(room){
     sys += "\n\n# ユーザーについて\n";
     if(room.userName) sys += "- ユーザーのことは「" + room.userName + "」と呼んでください。\n";
     if(room.userNote) sys += room.userNote + "\n";
+  }
+  {
+    const ob = loadObobi(room.id);
+    if(ob.items.length){
+      sys += "\n\n# おぼえ日帳（ユーザーと決めた記念日）\n";
+      for(const it of [...ob.items].sort((a, b) => (a.month - b.month) || (a.day - b.day))){
+        sys += "- " + it.month + "月" + it.day + "日 " + it.title + (it.year ? "（" + it.year + "年〜）" : "") + (it.note ? " ─ " + it.note : "") + "\n";
+      }
+      const today = todayObobi(room.id);
+      if(today.length){
+        const d = new Date();
+        sys += "\n★ 今日は" + (d.getMonth() + 1) + "月" + d.getDate() + "日、" +
+          today.map(t => "「" + t.title + "」の日" + (t.yrs ? "（" + t.yrs + "周年）" : "")).join("、") +
+          "です。今日の会話では、そのことを自然に心に留めて接してください。\n";
+      }
+    }
   }
   {
     const mono = loadMono(room.id);
@@ -4297,6 +4346,85 @@ $("monoAddBtn").onclick = () => {
   renderMono();
 };
 $("monoBtn").onclick = () => { renderMono(); openPanel($("monoPanel")); };
+
+/* ---------- v0.44 📅 おぼえ日帳 ---------- */
+function renderObobi(){
+  const box = $("obobiList");
+  box.innerHTML = "";
+  if(!currentRoom) return;
+  const ob = loadObobi(currentRoom.id);
+  if(ob.items.length === 0){
+    box.innerHTML = '<p class="hint" style="margin-bottom:10px">まだおぼえ日がないよ。</p>';
+    return;
+  }
+  const items = [...ob.items].sort((a, b) => (a.month - b.month) || (a.day - b.day));
+  for(const it of items){
+    const d = document.createElement("details");
+    d.className = "mono-item";
+    const sum = document.createElement("summary");
+    sum.textContent = "📅 " + it.month + "月" + it.day + "日 " + it.title + (it.year ? "（" + it.year + "年〜）" : "");
+    const dateRow = document.createElement("div");
+    dateRow.className = "row";
+    dateRow.style.cssText = "gap:6px;align-items:center;flex-wrap:wrap";
+    const mkNum = (val, ph, w) => {
+      const n = document.createElement("input");
+      n.type = "number"; n.value = val == null ? "" : val; n.placeholder = ph;
+      n.style.width = w; n.inputMode = "numeric";
+      return n;
+    };
+    const mi = mkNum(it.month, "月", "64px"); mi.min = 1; mi.max = 12;
+    const di = mkNum(it.day, "日", "64px"); di.min = 1; di.max = 31;
+    const yi = mkNum(it.year, "年(任意)", "92px");
+    dateRow.append(mi, document.createTextNode("月"), di, document.createTextNode("日"), yi, document.createTextNode("年〜"));
+    const ti = document.createElement("input");
+    ti.type = "text"; ti.value = it.title; ti.placeholder = "なんの日?（例: お迎え記念日）";
+    const ta = document.createElement("textarea");
+    ta.value = it.note || ""; ta.rows = 2; ta.placeholder = "メモ（任意。この子に伝えたいいわれ等）";
+    const row = document.createElement("div");
+    row.className = "row"; row.style.marginTop = "8px"; row.style.justifyContent = "flex-end";
+    const del = document.createElement("button");
+    del.className = "mbtn"; del.textContent = "✕";
+    del.title = "削除"; del.setAttribute("aria-label", "このおぼえ日を消す");
+    del.onclick = () => {
+      if(!confirm("「" + it.title + "」のおぼえ日を消すよ。いい？")) return;
+      const o = loadObobi(currentRoom.id);
+      o.items = o.items.filter(x => x.id !== it.id);
+      saveObobi(currentRoom.id, o);
+      syncPushPack();
+      renderObobi();
+    };
+    const sv = document.createElement("button");
+    sv.className = "btn primary"; sv.textContent = "保存";
+    sv.onclick = () => {
+      const m = parseInt(mi.value, 10), dy = parseInt(di.value, 10);
+      if(!(m >= 1 && m <= 12) || !(dy >= 1 && dy <= 31)){ alert("月と日を確かめてね（1〜12月・1〜31日）"); return; }
+      const y = parseInt(yi.value, 10);
+      const o = loadObobi(currentRoom.id);
+      const x = o.items.find(z => z.id === it.id);
+      if(x){
+        x.month = m; x.day = dy; x.year = isNaN(y) ? null : y;
+        x.title = ti.value.trim() || "名無しの記念日"; x.note = ta.value.trim();
+        x.ts = Date.now();
+      }
+      saveObobi(currentRoom.id, o);
+      syncPushPack();
+      renderObobi();
+    };
+    row.appendChild(del); row.appendChild(sv);
+    d.appendChild(sum); d.appendChild(dateRow); d.appendChild(ti); d.appendChild(ta); d.appendChild(row);
+    box.appendChild(d);
+  }
+}
+$("obobiAddBtn").onclick = () => {
+  if(!currentRoom) return;
+  const now = new Date();
+  const o = loadObobi(currentRoom.id);
+  o.items.push({ id: o.nextId++, month: now.getMonth() + 1, day: now.getDate(), year: null, title: "新しいおぼえ日", note: "", ts: Date.now() });
+  saveObobi(currentRoom.id, o);
+  renderObobi();
+};
+$("obobiBtn").onclick = () => { renderObobi(); openPanel($("obobiPanel")); };
+
 /* ---------- v0.27 レターボックス ---------- */
 function collectOldLetters(){
   /* 保管箱ができる前に届いた手紙を、全スレッドから拾って箱に入れるよ */
@@ -5213,6 +5341,7 @@ $("deleteRoomBtn").onclick = () => {
     del(ayumiKey(currentRoom.id));
     del(monoKey(currentRoom.id));
     del(letterKey(currentRoom.id));
+    del(obobiKey(currentRoom.id));
     albumDeleteRoom(currentRoom.id).catch(()=>{});
     imgDeleteRoom(currentRoom.id).catch(()=>{});
     rooms = rooms.filter(r => r.id !== currentRoom.id);
@@ -5633,7 +5762,7 @@ $("kozukaiBtn").onclick = () => {
 };
 $("wipeBtn").onclick = async () => {
   if(confirm("全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーを、この端末から全部消すよ。本当にいい?")){
-    for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(bgKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); del(monoKey(r.id)); del(letterKey(r.id)); }
+    for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(bgKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); del(monoKey(r.id)); del(letterKey(r.id)); del(obobiKey(r.id)); }
     del(LS_ROOMS); del(LS_GLOBAL);
     del("oheya_settings_v1"); del("oheya_chat_v1");
     try{ await kvClear(); }catch(e){}
@@ -5667,8 +5796,8 @@ $("exportAllBtn").onclick = exportAllMd;
 /* ---------- バックアップ ---------- */
 async function makeBackup(){
   const data = {
-    app: "oheya", version: 11, exportedAt: Date.now(),
-    rooms, chats: {}, shelves: {}, diaries: {}, ayumis: {}, monos: {}, letters: {}, avatars: {}, bgs: {}, albums: [], chatimgs: []
+    app: "oheya", version: 12, exportedAt: Date.now(),
+    rooms, chats: {}, shelves: {}, diaries: {}, ayumis: {}, monos: {}, letters: {}, obobis: {}, avatars: {}, bgs: {}, albums: [], chatimgs: []
   };
   for(const r of rooms){
     data.chats[r.id] = {};
@@ -5678,6 +5807,7 @@ async function makeBackup(){
     data.shelves[r.id] = loadShelf(r.id);
     data.monos[r.id] = loadMono(r.id);
     data.letters[r.id] = loadLetters(r.id);
+    data.obobis[r.id] = loadObobi(r.id);
     data.diaries[r.id] = loadDiary(r.id);
     data.ayumis[r.id] = loadAyumi(r.id);
     const av = loadRaw(avatarKey(r.id));
@@ -5774,7 +5904,7 @@ $("restoreInput").addEventListener("change", () => {
     const when = obj.exportedAt ? new Date(obj.exportedAt).toLocaleString("ja-JP") : "不明";
     if(!confirm("バックアップ（" + obj.rooms.length + "部屋・" + when + "保存）から復元するよ。\n今この端末にあるデータは置きかわるの。本当にいい?\n（心配なら先に💾で今の状態も保存してね）")) return;
     /* 今のデータを片付けてから復元 */
-    for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(bgKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); del(monoKey(r.id)); del(letterKey(r.id)); }
+    for(const r of rooms){ delRoomChats(r); del(avatarKey(r.id)); del(bgKey(r.id)); del(shelfKey(r.id)); del(diaryKey(r.id)); del(ayumiKey(r.id)); del(monoKey(r.id)); del(letterKey(r.id)); del(obobiKey(r.id)); }
     rooms = obj.rooms;
     save(LS_ROOMS, rooms);
     let photoTrouble = false;
@@ -5789,6 +5919,7 @@ $("restoreInput").addEventListener("change", () => {
       }
       save(shelfKey(r.id), (obj.shelves && obj.shelves[r.id]) || { nextId:1, items:[] });
       save(monoKey(r.id), (obj.monos && obj.monos[r.id]) || { nextId:1, items:[] });
+      save(obobiKey(r.id), (obj.obobis && obj.obobis[r.id]) || { nextId:1, items:[] });
       save(letterKey(r.id), (obj.letters && obj.letters[r.id]) || { items:[] });
       save(diaryKey(r.id), (obj.diaries && obj.diaries[r.id]) || { nextId:1, items:[] });
       save(ayumiKey(r.id), (obj.ayumis && obj.ayumis[r.id]) || { nextId:1, items:[] });
@@ -6493,7 +6624,8 @@ function syncPushPack(){
         id: r.id, name: r.name, model: r.model,
         sysPrompt: r.sysPrompt || "", userName: r.userName || "", userNote: r.userNote || "",
         memoryEnabled: !!r.memoryEnabled,
-        threadId: r.activeThread || (latestThread(r) || {}).id || ""
+        threadId: r.activeThread || (latestThread(r) || {}).id || "",
+        obobi: loadObobi(r.id).items.map(it => ({ month: it.month, day: it.day, year: it.year || null, title: it.title, note: it.note || "" }))
       }));
     const pack = { v: 1, ts: Date.now(), apiKey: global.apiKey || "", rooms: kids };
     kvPut(PUSH_PACK_KEY, JSON.stringify(pack)).catch(e => console.warn("しおりが置けなかった…", e));
