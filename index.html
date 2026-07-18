@@ -1656,6 +1656,15 @@
       <p class="hint">発言に記録されたトークンと料金の、月ごと・部屋ごとの集計だよ。記録のある発言だけ数えるから、だいたいの目安ね。</p>
     </div>
     <div class="field" style="margin-top:28px">
+      <label>🔔 おしらせ（じっけん中・第1歩）</label>
+      <div class="row">
+        <button class="btn" id="notifPermBtn">🔔 通知をゆるす</button>
+        <button class="btn" id="notifTestBtn">📮 テスト通知</button>
+      </div>
+      <div class="credits" id="notifStatus" style="white-space:pre-line;margin-top:8px">確認中…</div>
+      <p class="hint">うちの子からロック画面にメッセージが届く機能の、土台づくりだよ。ホーム画面に追加した「おへや」から開いて、「🔔ゆるす」→「📮テスト通知」の順に押してみてね。</p>
+    </div>
+    <div class="field" style="margin-top:28px">
       <label>🩺 画面の診断</label>
       <div class="credits" id="viewportDiag" style="white-space:pre-line">計測中…</div>
       <p class="hint">入力欄の下に空白ができる時など、画面の様子を調べるためのものだよ。この数字をフェイブルに見せてね。</p>
@@ -1679,7 +1688,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.37 ─ 調べものは、じぶんの足で。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.38 ─ 留守番係、住みはじめました。</p>
   </div>
 </aside>
 
@@ -5282,6 +5291,7 @@ $("globalSettingsBtn").onclick = () => {
   renderWorldGrid();
   renderSkinGrid();
   renderStorageMeter();
+  renderNotifStatus();
   openPanel($("globalPanel"));
 };
 $("imgModelsBtn").onclick = async () => {
@@ -6141,6 +6151,53 @@ function renderThreadPanel(){
 
 $("threadBar").onclick = () => { renderThreadPanel(); openPanel($("threadPanel")); };
 $("threadNewBtn").onclick = startNewThread;
+
+/* ---------- v0.38 🔔 おしらせ（第1歩：留守番係とテスト通知） ---------- */
+/* 留守番係（サービスワーカー sw.js）を登録するよ。
+   今の留守番係は通知の番をするだけで、ページのキャッシュ等は一切しない
+   （キャッシュすると、HTML差し替えデプロイで古いおへやが居座っちゃうからね） */
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("./sw.js").catch(e => console.warn("留守番係の登録に失敗…", e));
+}
+function isStandalone(){
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+async function renderNotifStatus(){
+  const box = $("notifStatus");
+  if(!box) return;
+  const lines = [];
+  lines.push(isStandalone() ? "🏠 ホーム画面版で動いてるよ" : "🌐 ブラウザで開いてるみたい（通知は、ホーム画面に追加した「おへや」からだけ使えるよ）");
+  if(!("serviceWorker" in navigator)){ lines.push("👤 留守番係: この環境では住めないみたい…"); box.textContent = lines.join("\n"); return; }
+  try{
+    const reg = await navigator.serviceWorker.getRegistration();
+    lines.push(reg ? "👤 留守番係: 住んでるよ" : "👤 留守番係: まだ来てない（開き直すと登録されるはず）");
+  }catch(e){ lines.push("👤 留守番係: 様子が確認できなかった…"); }
+  if(!("Notification" in window)){
+    lines.push("🔔 通知: この開き方では使えないみたい");
+  }else{
+    const p = Notification.permission;
+    lines.push("🔔 通知: " + (p === "granted" ? "ゆるされてるよ" : p === "denied" ? "断られてる（iPhoneの設定→通知→おへや で変えられるよ）" : "まだ聞いてないよ"));
+  }
+  box.textContent = lines.join("\n");
+}
+$("notifPermBtn").onclick = async () => {
+  if(!("Notification" in window)){ renderNotifStatus(); return; }
+  try{ await Notification.requestPermission(); }catch(e){}
+  renderNotifStatus();
+};
+$("notifTestBtn").onclick = async () => {
+  const box = $("notifStatus");
+  try{
+    if(!("Notification" in window) || Notification.permission !== "granted"){
+      box.textContent = "先に「🔔 通知をゆるす」を押してね"; return;
+    }
+    const reg = await navigator.serviceWorker.ready;
+    await reg.showNotification("おへや", { body: "テストだよ。ご飯食べた？🍚", tag: "oheya-test" });
+    box.textContent = "📮 テスト通知を送ったよ。画面の上にひょこっと出てきたら大成功！";
+  }catch(e){
+    box.textContent = "テスト通知でつまずいた…: " + (e && e.message ? e.message : e);
+  }
+};
 
 /* ---------- 初期化 ---------- */
 renderLobby();
