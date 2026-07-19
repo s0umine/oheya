@@ -1552,6 +1552,11 @@
         🗒 おつかい（Google ToDo）
       </label>
       <p class="hint">この子がGoogleのToDoリストを見たり、書き足したり、済みにしたりできるようになるよ。先に⚙️の「🗒Googleれんけい」の準備が必要なの。ツール機能に対応したモデルで使ってね。</p>
+      <label class="check-row">
+        <input type="checkbox" id="nemuriEnabled">
+        🌙 ねむりおつかい
+      </label>
+      <p class="hint">🔔おしらせがONの子なら、夜のおしらせ便のついでに、この子が自分の判断でToDoを見て書き足せるようになるよ（見る・書き足すだけ、1晩2件まで。済みにしたり消したりはしないの）。朝、リストを見るのが楽しみになるね。</p>
     </div>
 
     <div class="section-title">わたしのこと（この子にだけ伝わるよ）</div>
@@ -1810,7 +1815,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.47 ─ 画材箱をひらいたら、みんなの姿がブレないよ。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.48 ─ ねむっている間に、そっとおつかい。</p>
   </div>
 </aside>
 
@@ -5469,6 +5474,7 @@ function openProfile(){
   $("letterEnabled").checked = !!currentRoom.letterEnabled;
   $("pushEnabled").checked = !!currentRoom.pushEnabled;
   $("todoEnabled").checked = !!currentRoom.todoEnabled;
+  $("nemuriEnabled").checked = !!currentRoom.nemuriEnabled;
   $("modelSearch").value = "";
   $("modelList").classList.remove("show");
   pendingModel = currentRoom.model
@@ -5672,6 +5678,7 @@ $("saveProfileBtn").onclick = () => {
   currentRoom.letterEnabled = $("letterEnabled").checked;
   currentRoom.pushEnabled = $("pushEnabled").checked;
   currentRoom.todoEnabled = $("todoEnabled").checked;
+  currentRoom.nemuriEnabled = $("nemuriEnabled").checked;
   currentRoom.theme = pendingTheme;
   currentRoom.customLamp = pendingCustom.lamp;
   currentRoom.customUser = pendingCustom.user;
@@ -7020,10 +7027,12 @@ function syncPushPack(){
         id: r.id, name: r.name, model: r.model,
         sysPrompt: r.sysPrompt || "", userName: r.userName || "", userNote: r.userNote || "",
         memoryEnabled: !!r.memoryEnabled,
+        nemuri: !!r.nemuriEnabled,
         threadId: r.activeThread || (latestThread(r) || {}).id || "",
         obobi: loadObobi(r.id).items.map(it => ({ month: it.month, day: it.day, year: it.year || null, title: it.title, note: it.note || "" }))
       }));
-    const pack = { v: 1, ts: Date.now(), apiKey: global.apiKey || "", rooms: kids };
+    const pack = { v: 1, ts: Date.now(), apiKey: global.apiKey || "",
+      workerUrl: global.pushWorkerUrl || "", workerToken: global.workerToken || "", rooms: kids };
     kvPut(PUSH_PACK_KEY, JSON.stringify(pack)).catch(e => console.warn("しおりが置けなかった…", e));
   }catch(e){ console.warn("しおり作りでつまずいた…", e); }
 }
