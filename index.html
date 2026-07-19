@@ -270,6 +270,8 @@
   .room-card.kanri{border-color:var(--lamp)}
   .room-card.hiroba{border-style:double;border-width:3px}
   .sname{display:block;font-size:10.5px;color:var(--muted);margin:0 0 3px 4px}
+  .speakbtn{border:none;background:none;cursor:pointer;font-size:13px;line-height:1;opacity:.6;padding:0 4px;margin-left:2px}
+  .speakbtn:active{opacity:1}
   #speakerBar{
     display:flex;gap:6px;overflow-x:auto;align-items:stretch;
     padding:8px 12px 2px;
@@ -1496,6 +1498,11 @@
       <button class="btn" id="webModelsBtn" style="margin-top:6px">🌱 この端末に住む子をさがす（実験）</button>
     </div>
     <div class="field">
+      <label for="voiceId">🎙 この子の声（Voice ID・任意）</label>
+      <input type="text" id="voiceId" placeholder="ElevenLabsのVoice ID" autocomplete="off">
+      <p class="hint">⚙️の🎙声工房にキーを入れて、ここに声のIDを貼ると、ふきだしの🔊でこの子の声が聞けるようになるよ。</p>
+    </div>
+    <div class="field">
       <label for="sysPrompt">この子のプロンプト（性格・口調・設定）</label>
       <textarea id="sysPrompt" placeholder="例：あなたの名前はソラ。おだやかで詩的な話し方をする。"></textarea>
     </div>
@@ -1781,6 +1788,15 @@
       <p class="hint">うちの子がGoogleのToDoリストへおつかいに行けるようになる窓口だよ。上の⏰URLと🗝あいことばを入れて保存→「🔗Googleとつなぐ」でGoogleの許可画面を一度だけ通ってね（「このアプリは確認されていません」と出ても、自分で作った窓口だから「詳細」→「移動」で大丈夫）。Googleの合鍵はぜんぶCloudflareの金庫にしまわれて、おへや本体やこの端末には残らないの。</p>
     </div>
     <div class="field" style="margin-top:28px">
+      <label>🎙 声工房（じっけん中）</label>
+      <div class="row" style="margin-top:6px">
+        <input type="password" id="ttsKey" placeholder="ElevenLabsのAPIキー" autocomplete="off" style="flex:1">
+        <button class="btn" id="toggleTtsKey" type="button">表示</button>
+      </div>
+      <input type="text" id="ttsModel" placeholder="声のモデル（ふつうは空欄のままでOK）" autocomplete="off" style="margin-top:8px">
+      <p class="hint">うちの子のふきだしを、その子の声で読み上げる工房だよ。ElevenLabsのサイトで声を仕立てて（Voices → 声をさがす/作る）、できた声のID（Voice ID）を部屋プロフィールの🎙欄に貼ってね。キーはこの端末のブラウザにだけ保存。読み上げた文字数ぶんクレジットを使うから、残りはElevenLabsのサイトで確かめてね。</p>
+    </div>
+    <div class="field" style="margin-top:28px">
       <label>🖼 アイコン工房（じっけん中）</label>
       <input type="file" id="iconFile" accept="image/*" hidden>
       <button class="btn" id="iconPickBtn" style="width:100%">🖼 画像をえらぶ</button>
@@ -1828,7 +1844,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.49 ─ ローカルの住まいを、2軒から選べるよ。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.50 ─ うちの子の声が、きこえるよ。</p>
   </div>
 </aside>
 
@@ -2438,6 +2454,65 @@ function renderMd(src){
   return s;
 }
 
+/* ---------- v0.50 🎙 声工房（読み上げ） ---------- */
+let ttsAudio = null;
+let ttsNowBtn = null;
+/* iPhoneの「タップした人だけ音を出せる」お作法用の、いちばん短い無音 */
+const TTS_SILENT = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+function ttsStop(){
+  if(ttsAudio){ try{ ttsAudio.pause(); }catch(e){} }
+  if(ttsNowBtn){ ttsNowBtn.textContent = "🔊"; ttsNowBtn = null; }
+}
+function ttsClean(t){
+  let x = String(t || "");
+  x = x.replace(/```[\s\S]*?```/g, "。コードは省略。");
+  x = x.replace(/https?:\/\/\S+/g, "");
+  x = x.replace(/[*_#>`~|]/g, "");
+  x = x.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, "");
+  return x.trim().slice(0, 2000); /* 読みすぎ防止（クレジットのおまもり） */
+}
+async function speakBubble(btn, who, bubble){
+  if(ttsNowBtn === btn){ ttsStop(); return; } /* もう一度タップ＝止める */
+  ttsStop();
+  const voiceId = ((who && who.voiceId) || "").trim();
+  if(!global.ttsKey || !voiceId) return;
+  const text = ttsClean(bubble.textContent || "");
+  if(!text) return;
+  if(!ttsAudio){
+    ttsAudio = new Audio();
+    ttsAudio.addEventListener("ended", ttsStop);
+  }
+  try{ ttsAudio.src = TTS_SILENT; ttsAudio.play().catch(() => {}); }catch(e){} /* 音の扉を先に開けておく */
+  btn.textContent = "⏳";
+  ttsNowBtn = btn;
+  try{
+    let url = btn._url;
+    if(!url || btn._txt !== text){
+      const res = await fetch("https://api.elevenlabs.io/v1/text-to-speech/" + encodeURIComponent(voiceId) + "?output_format=mp3_44100_128", {
+        method: "POST",
+        headers: { "xi-api-key": global.ttsKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text, model_id: ((global.ttsModel || "").trim() || "eleven_multilingual_v2") })
+      });
+      if(!res.ok){
+        let detail = "";
+        try{ detail = (await res.text()).slice(0, 200); }catch(e){}
+        throw new Error("声工房でつまずいた（HTTP " + res.status + "）" + (detail ? "\n" + detail : ""));
+      }
+      const blob = await res.blob();
+      if(btn._url){ try{ URL.revokeObjectURL(btn._url); }catch(e){} }
+      url = URL.createObjectURL(blob);
+      btn._url = url; btn._txt = text; /* 同じふきだしの聞き直しはタダ */
+    }
+    if(ttsNowBtn !== btn) return; /* 待ってる間に止められた */
+    ttsAudio.src = url;
+    await ttsAudio.play();
+    if(ttsNowBtn === btn) btn.textContent = "⏹";
+  }catch(e){
+    if(ttsNowBtn === btn) ttsStop();
+    alert((e && e.message) ? e.message : "声が出せなかった…もう一度試してみてね");
+  }
+}
+
 function addBubble(role, content, usage, imgId, speaker, entry){
   let bubble;
   if(role === "assistant"){
@@ -2457,6 +2532,14 @@ function addBubble(role, content, usage, imgId, speaker, entry){
     bubble.className = "msg assistant";
     bubble.innerHTML = renderMd(content);
     bubble.style.whiteSpace = "normal";
+    if(global.ttsKey && who && who.voiceId){
+      const spk = document.createElement("button");
+      spk.className = "speakbtn";
+      spk.textContent = "🔊";
+      spk.setAttribute("aria-label", "この子の声で聞く");
+      spk.onclick = () => speakBubble(spk, who, bubble);
+      head.appendChild(spk);
+    }
     if(entry && entry.imgId){
       const im = document.createElement("img");
       im.className = "chatimg";
@@ -5496,6 +5579,7 @@ function openProfile(){
   $("pushEnabled").checked = !!currentRoom.pushEnabled;
   $("todoEnabled").checked = !!currentRoom.todoEnabled;
   $("nemuriEnabled").checked = !!currentRoom.nemuriEnabled;
+  $("voiceId").value = currentRoom.voiceId || "";
   {
     const lsel = $("localSlotSel");
     lsel.innerHTML = "";
@@ -5712,6 +5796,7 @@ $("saveProfileBtn").onclick = () => {
   currentRoom.pushEnabled = $("pushEnabled").checked;
   currentRoom.todoEnabled = $("todoEnabled").checked;
   currentRoom.nemuriEnabled = $("nemuriEnabled").checked;
+  currentRoom.voiceId = $("voiceId").value.trim();
   currentRoom.localSlot = $("localSlotSel").value === "1" ? 1 : 0;
   currentRoom.theme = pendingTheme;
   currentRoom.customLamp = pendingCustom.lamp;
@@ -5956,6 +6041,13 @@ $("globalSettingsBtn").onclick = () => {
     };
   }
   $("workerToken").value = global.workerToken || "";
+  $("ttsKey").value = global.ttsKey || "";
+  $("ttsModel").value = global.ttsModel || "";
+  $("toggleTtsKey").onclick = () => {
+    const el = $("ttsKey");
+    el.type = el.type === "password" ? "text" : "password";
+    $("toggleTtsKey").textContent = el.type === "password" ? "表示" : "隠す";
+  };
   $("chatNavSel").value = global.chatNav || "buttons";
   $("toggleWorkerToken").onclick = () => {
     const el = $("workerToken");
@@ -6009,6 +6101,8 @@ $("saveGlobalBtn").onclick = () => {
     token: $("localToken" + li).value.replace(/\s+/g, "")
   }));
   global.workerToken = $("workerToken").value.replace(/\s+/g, "");
+  global.ttsKey = $("ttsKey").value.replace(/\s+/g, "");
+  global.ttsModel = $("ttsModel").value.trim();
   global.imgModel = $("imgModel").value.trim();
   global.chatNav = $("chatNavSel").value;
   save(LS_GLOBAL, global);
