@@ -270,8 +270,9 @@
   .room-card.kanri{border-color:var(--lamp)}
   .room-card.hiroba{border-style:double;border-width:3px}
   .sname{display:block;font-size:10.5px;color:var(--muted);margin:0 0 3px 4px}
-  .speakbtn{border:none;background:none;cursor:pointer;font-size:13px;line-height:1;opacity:.6;padding:0 4px;margin-left:2px}
+  .speakbtn{border:none;background:none;cursor:pointer;font-size:12px;line-height:1;opacity:.65;padding:0 4px;margin-left:2px;color:var(--muted)}
   .speakbtn:active{opacity:1}
+  .speakbtn svg{width:14px;height:14px;vertical-align:-3px;display:inline-block}
   #speakerBar{
     display:flex;gap:6px;overflow-x:auto;align-items:stretch;
     padding:8px 12px 2px;
@@ -1500,7 +1501,13 @@
     <div class="field">
       <label for="voiceId">🎙 この子の声（Voice ID・任意）</label>
       <input type="text" id="voiceId" placeholder="ElevenLabsのVoice ID" autocomplete="off">
-      <p class="hint">⚙️の🎙声工房にキーを入れて、ここに声のIDを貼ると、ふきだしの🔊でこの子の声が聞けるようになるよ。</p>
+      <select id="voiceStyle" style="margin-top:8px">
+        <option value="">演技: おまかせ（声の既定のまま）</option>
+        <option value="0">演技: のびのび（感情ゆたか・ゆらぎ多め）</option>
+        <option value="0.5">演技: ふつう</option>
+        <option value="1">演技: かっちり（安定重視・淡々と）</option>
+      </select>
+      <p class="hint">⚙️の🎙声工房にキーを入れて、ここに声のIDを貼ると、ふきだしの🔊でこの子の声が聞けるようになるよ。「演技」はこの部屋の読み上げに直接効くの（v3なら、のびのび＝Creative・ふつう＝Natural・かっちり＝Robust）。</p>
     </div>
     <div class="field">
       <label for="sysPrompt">この子のプロンプト（性格・口調・設定）</label>
@@ -1844,7 +1851,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.50 ─ うちの子の声が、きこえるよ。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.51 ─ 声のボタンが着がえて、声を連れて帰れるよ。</p>
   </div>
 </aside>
 
@@ -2455,13 +2462,32 @@ function renderMd(src){
 }
 
 /* ---------- v0.50 🎙 声工房（読み上げ） ---------- */
+/* v0.51: 絵文字だとiPhoneで化ける記号もあるから、線画で描いたアイコンたち */
+const ICON_SPK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 3 9 3 15 6 15 11 19 11 5" fill="currentColor" stroke="none"></polygon><path d="M15.5 9a4.2 4.2 0 0 1 0 6"></path><path d="M18.2 6.5a8 8 0 0 1 0 11"></path></svg>';
+const ICON_STOP = '<svg viewBox="0 0 24 24"><rect x="7.5" y="7.5" width="9" height="9" rx="1.5" fill="currentColor"></rect></svg>';
+const ICON_DL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v9"></path><polyline points="7.5 9.5 12 14 16.5 9.5"></polyline><path d="M5 19h14"></path></svg>';
+async function ttsDownload(spkBtn, who){
+  const blob = spkBtn._blob;
+  if(!blob) return;
+  const fname = (((who && who.name) || "koe").replace(/[\/:*?"<>|]/g, "") || "koe") + "_" +
+    new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-") + ".mp3";
+  const file = new File([blob], fname, { type: "audio/mpeg" });
+  if(navigator.canShare && navigator.canShare({ files: [file] })){
+    try{ await navigator.share({ files: [file] }); return; }
+    catch(e){ if(e && e.name === "AbortError") return; }
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = fname;
+  document.body.appendChild(a); a.click(); a.remove();
+}
 let ttsAudio = null;
 let ttsNowBtn = null;
 /* iPhoneの「タップした人だけ音を出せる」お作法用の、いちばん短い無音 */
 const TTS_SILENT = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
 function ttsStop(){
   if(ttsAudio){ try{ ttsAudio.pause(); }catch(e){} }
-  if(ttsNowBtn){ ttsNowBtn.textContent = "🔊"; ttsNowBtn = null; }
+  if(ttsNowBtn){ ttsNowBtn.innerHTML = ICON_SPK; ttsNowBtn = null; }
 }
 function ttsClean(t){
   let x = String(t || "");
@@ -2483,15 +2509,21 @@ async function speakBubble(btn, who, bubble){
     ttsAudio.addEventListener("ended", ttsStop);
   }
   try{ ttsAudio.src = TTS_SILENT; ttsAudio.play().catch(() => {}); }catch(e){} /* 音の扉を先に開けておく */
-  btn.textContent = "⏳";
+  btn.textContent = "…";
   ttsNowBtn = btn;
   try{
+    const model = ((global.ttsModel || "").trim() || "eleven_multilingual_v2");
+    const style = (who && who.voiceStyle !== undefined) ? String(who.voiceStyle) : "";
+    const sig = text + "|" + model + "|" + style + "|" + voiceId;
     let url = btn._url;
-    if(!url || btn._txt !== text){
+    if(!url || btn._txt !== sig){
       const res = await fetch("https://api.elevenlabs.io/v1/text-to-speech/" + encodeURIComponent(voiceId) + "?output_format=mp3_44100_128", {
         method: "POST",
         headers: { "xi-api-key": global.ttsKey, "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text, model_id: ((global.ttsModel || "").trim() || "eleven_multilingual_v2") })
+        body: JSON.stringify(Object.assign(
+          { text: text, model_id: model },
+          style !== "" ? { voice_settings: { stability: parseFloat(style) } } : {}
+        ))
       });
       if(!res.ok){
         let detail = "";
@@ -2501,12 +2533,13 @@ async function speakBubble(btn, who, bubble){
       const blob = await res.blob();
       if(btn._url){ try{ URL.revokeObjectURL(btn._url); }catch(e){} }
       url = URL.createObjectURL(blob);
-      btn._url = url; btn._txt = text; /* 同じふきだしの聞き直しはタダ */
+      btn._url = url; btn._txt = sig; btn._blob = blob; /* 同じふきだし・同じ設定の聞き直しはタダ */
+      if(btn._dl) btn._dl.style.display = ""; /* 声ができたら連れて帰れる */
     }
     if(ttsNowBtn !== btn) return; /* 待ってる間に止められた */
     ttsAudio.src = url;
     await ttsAudio.play();
-    if(ttsNowBtn === btn) btn.textContent = "⏹";
+    if(ttsNowBtn === btn) btn.innerHTML = ICON_STOP;
   }catch(e){
     if(ttsNowBtn === btn) ttsStop();
     alert((e && e.message) ? e.message : "声が出せなかった…もう一度試してみてね");
@@ -2535,10 +2568,18 @@ function addBubble(role, content, usage, imgId, speaker, entry){
     if(global.ttsKey && who && who.voiceId){
       const spk = document.createElement("button");
       spk.className = "speakbtn";
-      spk.textContent = "🔊";
+      spk.innerHTML = ICON_SPK;
       spk.setAttribute("aria-label", "この子の声で聞く");
       spk.onclick = () => speakBubble(spk, who, bubble);
       head.appendChild(spk);
+      const dl = document.createElement("button");
+      dl.className = "speakbtn";
+      dl.innerHTML = ICON_DL;
+      dl.setAttribute("aria-label", "この声を保存する");
+      dl.style.display = "none"; /* 一度聞いてからのお楽しみ */
+      dl.onclick = () => ttsDownload(spk, who);
+      spk._dl = dl;
+      head.appendChild(dl);
     }
     if(entry && entry.imgId){
       const im = document.createElement("img");
@@ -5580,6 +5621,7 @@ function openProfile(){
   $("todoEnabled").checked = !!currentRoom.todoEnabled;
   $("nemuriEnabled").checked = !!currentRoom.nemuriEnabled;
   $("voiceId").value = currentRoom.voiceId || "";
+  $("voiceStyle").value = (currentRoom.voiceStyle === undefined) ? "" : String(currentRoom.voiceStyle);
   {
     const lsel = $("localSlotSel");
     lsel.innerHTML = "";
@@ -5797,6 +5839,7 @@ $("saveProfileBtn").onclick = () => {
   currentRoom.todoEnabled = $("todoEnabled").checked;
   currentRoom.nemuriEnabled = $("nemuriEnabled").checked;
   currentRoom.voiceId = $("voiceId").value.trim();
+  currentRoom.voiceStyle = $("voiceStyle").value;
   currentRoom.localSlot = $("localSlotSel").value === "1" ? 1 : 0;
   currentRoom.theme = pendingTheme;
   currentRoom.customLamp = pendingCustom.lamp;
