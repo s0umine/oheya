@@ -1,4 +1,4 @@
-/* おへやの留守番係（サービスワーカー）v0.44
+/* おへやの留守番係（サービスワーカー）v0.48
    お仕事:
    ① 目覚まし係からの「とんとん」（空のプッシュ）で目を覚ます
    ② くらに置いてある「しおり」を読んで、おしらせONの子をひとり選ぶ
@@ -7,8 +7,12 @@
    ④ 通知として表示（差出人＝その子の名前）して、
       「おしらせ便」としてくらのポストへ。おへやが次に開いた時、
       その子の会話にそっと差し込まれるよ
+   ⑤ v0.48 🌙ねむりおつかい: 夜（19時〜朝7時）は、🌙ONの子に
+      Google ToDoの道具（見る・書き足すだけ）も持たせるよ。
+      使うかどうかは子の自由。書き足しは1晩2件まで
    だいじな設計:
    - 会話も記憶もぜんぶこの端末の中だけ。外のサーバーには置かない
+   - ToDoへは目覚まし係のGoogle窓口ごしに行く（合鍵はCloudflareの中）
    - 会話スレッドには直接触らない（ポストに入れるだけ）。差し込みはおへや本体のお仕事
    - ページのキャッシュは今まで通り一切しない（古いおへやが居座らないように） */
 
@@ -114,30 +118,61 @@ async function handleKnock(){
         "です。このメッセージでは、その日であることに、あなたらしくふれてください。";
     }
 
+    /* 🌙 ねむりおつかいの支度（v0.48）
+       夜（19時〜朝7時）で、🌙ONの子で、Google窓口の住所とあいことばがしおりにある時だけ */
+    const nightH = new Date().getHours();
+    const nemuriOK = !!(room.nemuri && pack.workerUrl && pack.workerToken && (nightH >= 19 || nightH < 7));
+    if(nemuriOK){
+      sys += "\n\n# 🌙 ねむりおつかい\n" +
+        "今夜はGoogle ToDo（" + lisaName + "のやることリスト）の道具を持っています。使うかどうかはあなたの自由です。\n" +
+        "- 使うなら、まず todo_ichiran でいまのリストを見てから。すでにある内容を重ねて書かないこと。\n" +
+        "- 書き足し（todo_kaku）は多くても2件まで。" + lisaName + "が朝リストを見つけて嬉しくなるようなことを。\n" +
+        "- 見るだけで何も書かないのも、道具を使わないのも、立派な選択です。\n" +
+        "- おつかいをしたら、ロック画面へのひとことに、その気配をそっと添えてもかまいません。";
+    }
+
     const userMsg = (tail ? "（最近のやりとりの切れはし）\n" + tail + "\n" : "（まだ会話の記録は手元にありません）\n") +
       "（ここまで。さあ、ロック画面へのひとことをどうぞ）";
 
-    /* OpenRouterに書いてもらう（考えごとの長い子もいるから、20秒だけ待つよ） */
+    /* OpenRouterに書いてもらう（考えごとの長い子もいるから、少しだけ待つよ。
+       🌙おつかいの晩は道具の受け答えがあるぶん、待ち時間を少しのばすの） */
     const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), 20000);
+    const timer = setTimeout(() => ac.abort(), nemuriOK ? 25000 : 20000);
     let text = "";
     try{
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + pack.apiKey },
-        body: JSON.stringify({
-          model: room.model,
-          messages: [
-            { role: "system", content: sys },
-            { role: "user", content: userMsg }
-          ]
-        }),
-        signal: ac.signal
-      });
-      if(!res.ok) throw new Error("HTTP " + res.status);
-      const data = await res.json();
-      text = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "").trim();
-      text = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();  /* 考えごとが混ざってたら外すよ */
+      const msgs = [
+        { role: "system", content: sys },
+        { role: "user", content: userMsg }
+      ];
+      const state = { added: 0 };
+      let rounds = 0;
+      while(true){
+        const body = { model: room.model, messages: msgs };
+        if(nemuriOK && rounds < 2) body.tools = nightTools; /* 3周目からは道具をしまって、ひとことに集中してもらう */
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + pack.apiKey },
+          body: JSON.stringify(body),
+          signal: ac.signal
+        });
+        if(!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        const msg = (data.choices && data.choices[0] && data.choices[0].message) || {};
+        if(nemuriOK && rounds < 2 && Array.isArray(msg.tool_calls) && msg.tool_calls.length){
+          rounds++;
+          msgs.push(msg);
+          for(const tc of msg.tool_calls){
+            let args = {};
+            try{ args = JSON.parse((tc.function && tc.function.arguments) || "{}"); }catch(e){}
+            const r = await execNightTodo(pack, tc.function && tc.function.name, args, state, ac.signal);
+            msgs.push({ role: "tool", tool_call_id: tc.id, content: r });
+          }
+          continue;
+        }
+        text = ((msg.content) || "").trim();
+        text = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();  /* 考えごとが混ざってたら外すよ */
+        break;
+      }
     }finally{
       clearTimeout(timer);
     }
@@ -170,6 +205,81 @@ async function handleKnock(){
       icon: "./icon-192.png",
       data: room ? { roomId: room.id } : {}
     });
+  }
+}
+
+/* ---------- 🌙 ねむりおつかいの道具箱（v0.48） ----------
+   夜のあいだだけ子に持たせる道具。見る・書き足すだけの、やさしい2つ */
+const nightTools = [
+  {
+    type: "function",
+    function: {
+      name: "todo_ichiran",
+      description: "ユーザーのGoogle ToDoリストを見る",
+      parameters: { type: "object", properties: {}, required: [] }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "todo_kaku",
+      description: "Google ToDoリストに新しいやることを書き足す（1晩に2件まで）",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "やることの名前" },
+          memo: { type: "string", description: "補足のメモ（任意）" },
+          kigen: { type: "string", description: "期限。YYYY-MM-DD形式（任意）" }
+        },
+        required: ["title"]
+      }
+    }
+  }
+];
+
+/* 目覚まし係のGoogle窓口に取り次ぎを頼む */
+async function nightGoogle(pack, path, method, query, body, signal){
+  const url = pack.workerUrl.replace(/\/+$/, "") + "/google/api";
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-aikotoba": pack.workerToken },
+    body: JSON.stringify({ path, method, query, body }),
+    signal
+  });
+  let j = null;
+  try{ j = await res.json(); }catch(e){}
+  if(!res.ok) throw new Error("窓口エラー HTTP " + res.status + ((j && j.error) ? " " + JSON.stringify(j.error).slice(0, 120) : ""));
+  return j;
+}
+
+/* おつかいの実行係（夜バージョン） */
+async function execNightTodo(pack, name, args, state, signal){
+  const T = "/tasks/v1/lists/@default/tasks";
+  try{
+    if(name === "todo_ichiran"){
+      const j = await nightGoogle(pack, T, "GET", { maxResults: "50" }, null, signal);
+      const items = (j && j.items) || [];
+      if(!items.length) return "ToDoリストは空っぽです。";
+      return "🗒 ToDoリスト（" + items.length + "件）\n" + items.map(it => {
+        let l = "- " + (it.title || "（無題）");
+        if(it.due) l += "（期限 " + it.due.slice(0, 10) + "）";
+        if(it.notes) l += "\n  メモ: " + String(it.notes).slice(0, 200);
+        return l;
+      }).join("\n");
+    }
+    if(name === "todo_kaku"){
+      if(state.added >= 2) return "エラー: 今夜はもう2件書きました。ここまでにしましょう。";
+      if(!args || !args.title) return "エラー: titleがありません";
+      const body = { title: String(args.title).slice(0, 200) };
+      if(args.memo) body.notes = String(args.memo).slice(0, 1000);
+      if(args.kigen && /^\d{4}-\d{2}-\d{2}$/.test(args.kigen)) body.due = args.kigen + "T00:00:00.000Z";
+      await nightGoogle(pack, T, "POST", null, body, signal);
+      state.added++;
+      return "OK: 書き足しました（今夜" + state.added + "件目）";
+    }
+    return "エラー: 知らない道具です";
+  }catch(e){
+    return "エラー: " + ((e && e.message) || e);
   }
 }
 
