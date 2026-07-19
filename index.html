@@ -1489,7 +1489,10 @@
       <div id="modelList"></div>
       <div class="selected-model" id="selectedModel"></div>
       <p class="hint">検索して選ぶか、モデルIDを直接貼ってもOK。</p>
-      <button class="btn" id="localModelsBtn" style="margin-top:6px">🏠 ローカルの子をさがす（LM Studio）</button>
+      <div class="row" style="margin-top:6px">
+        <select id="localSlotSel" style="flex:1"></select>
+        <button class="btn" id="localModelsBtn" style="flex:1">🏠 ローカルの子をさがす</button>
+      </div>
       <button class="btn" id="webModelsBtn" style="margin-top:6px">🌱 この端末に住む子をさがす（実験）</button>
     </div>
     <div class="field">
@@ -1679,13 +1682,23 @@
       <p class="hint">キーはこの端末のブラウザにだけ保存されるよ。</p>
     </div>
     <div class="field">
-      <label for="localUrl">🏠 ローカルLLMの接続先（LM Studioなど・任意）</label>
-      <input type="text" id="localUrl" placeholder="http://localhost:1234/v1" autocomplete="off">
+      <label>🏠 ローカルLLMの住まい（2軒まで・任意）</label>
+      <p class="hint" style="margin-top:6px">LM StudioやOllamaなど、OpenAI互換のローカルサーバーを2軒まで覚えられるよ。どっちに繋ぐかは、部屋ごとにモデル欄の「つなぐ先」で選ぶの。</p>
+      <label for="localName0" style="margin-top:6px;display:block">1軒目</label>
+      <input type="text" id="localName0" placeholder="なまえ（例：デスクトップPC）" autocomplete="off">
+      <input type="text" id="localUrl0" placeholder="http://localhost:1234/v1" autocomplete="off" style="margin-top:8px">
       <div class="row" style="margin-top:8px">
-        <input type="password" id="localToken" placeholder="🔑 ローカルのAPIトークン（必要な時だけ）" autocomplete="off">
-        <button class="btn" id="toggleLocalToken" style="flex:0 0 auto">表示</button>
+        <input type="password" id="localToken0" placeholder="🔑 APIトークン（必要な時だけ）" autocomplete="off">
+        <button class="btn" id="toggleLocalToken0" style="flex:0 0 auto">表示</button>
       </div>
-      <p class="hint">LM Studio側でサーバーONとCORSをONにしてね。Tailscaleなどで外から繋ぐ時にLM Studioがトークン（合言葉）を求める設定なら、同じものを🔑欄に入れてね。</p>
+      <label for="localName1" style="margin-top:14px;display:block">2軒目</label>
+      <input type="text" id="localName1" placeholder="なまえ（例：ノートPC）" autocomplete="off">
+      <input type="text" id="localUrl1" placeholder="http://100.x.x.x:1234/v1 など" autocomplete="off" style="margin-top:8px">
+      <div class="row" style="margin-top:8px">
+        <input type="password" id="localToken1" placeholder="🔑 APIトークン（必要な時だけ）" autocomplete="off">
+        <button class="btn" id="toggleLocalToken1" style="flex:0 0 auto">表示</button>
+      </div>
+      <p class="hint">サーバー側で ①サーバーをON ②CORSをON ③モデルをロード、をしておいてね。Tailscaleなどで外から繋ぐ時にサーバーがトークン（合言葉）を求める設定なら、同じものを🔑欄に入れてね。</p>
       <label for="imgModel" style="margin-top:18px;display:block">🎨 絵筆（お絵かきモデル・任意）</label>
       <input type="text" id="imgModel" placeholder="例: google/gemini-2.5-flash-image" autocomplete="off">
       <button class="btn" id="imgModelsBtn" style="width:100%;margin-top:8px">🎨 お絵かきできるモデルをさがす</button>
@@ -1815,7 +1828,7 @@
       <button class="btn danger" id="wipeBtn" style="width:100%;margin-top:10px">ぜんぶ空にする</button>
       <p class="hint">全部屋の会話・設定・写真・記憶・日記・あゆみ・アルバム・APIキーをこの端末から消すよ。</p>
     </div>
-    <p class="hint" style="margin-top:24px">おへや v0.48 ─ ねむっている間に、そっとおつかい。</p>
+    <p class="hint" style="margin-top:24px">おへや v0.49 ─ ローカルの住まいを、2軒から選べるよ。</p>
   </div>
 </aside>
 
@@ -1982,6 +1995,13 @@ function del(k){
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
 let global = load(LS_GLOBAL) || { apiKey:"" };
+/* v0.49 ローカル2枠化: 旧設定（1枠）を1軒目へお引っ越し */
+if(!Array.isArray(global.locals)){
+  global.locals = [
+    { name: "", url: global.localUrl || "", token: global.localToken || "" },
+    { name: "", url: "", token: "" }
+  ];
+}
 let rooms  = load(LS_ROOMS) || [];
 
 /* 旧バージョンからのフィールド補完 */
@@ -4135,26 +4155,27 @@ async function callLLM(messages, tools){
   if(!isLocal && /^anthropic\//.test(asRoom.model || "")) body.cache_control = { type: "ephemeral" };
   if(!isLocal && asRoom.reasoningEnabled) body.reasoning = { enabled: true };
 
-  const endpoint = isLocal ? (localApiUrl() + "/chat/completions") : "https://openrouter.ai/api/v1/chat/completions";
+  const lslot = isLocal ? localSlotOf(asRoom) : null;
+  const endpoint = isLocal ? (lslot.url + "/chat/completions") : "https://openrouter.ai/api/v1/chat/completions";
   let res;
   try{
     res = await fetch(endpoint, {
       method: "POST",
       headers: {
-        "Authorization": "Bearer " + (isLocal ? (global.localToken || "lm-studio") : global.apiKey),
+        "Authorization": "Bearer " + (isLocal ? lslot.token : global.apiKey),
         "Content-Type": "application/json"
       },
       body: JSON.stringify(body)
     });
   }catch(e){
-    if(isLocal) throw { jp: "🏠のローカルLLMに繋がらなかったよ。LM Studioで ①ローカルサーバーがON ②CORSがON ③モデルがロード済み ④トークンが必要な設定なら⚙️の🔑欄と一致してるか 見てみて（接続先: " + localApiUrl() + "）" };
+    if(isLocal) throw { jp: "🏠のローカルLLM（" + lslot.name + "）に繋がらなかったよ。サーバー側で ①サーバーがON ②CORSがON ③モデルがロード済み ④トークンが必要な設定なら⚙️の🔑欄と一致してるか 見てみて（接続先: " + lslot.url + "）" };
     throw e;
   }
 
   if(!res.ok){
     let apiMsg = "";
     try{ const j = await res.json(); apiMsg = j?.error?.message || ""; }catch(e){}
-    if(isLocal) throw { jp: "🏠には届いたけど断られちゃった（" + res.status + "）" + (apiMsg ? "。サーバーの言い分:「" + apiMsg + "」" : "") + "。トークン絡みなら⚙️の🔑欄をLM Studioと突き合わせてみて。" };
+    if(isLocal) throw { jp: "🏠（" + lslot.name + "）には届いたけど断られちゃった（" + res.status + "）" + (apiMsg ? "。サーバーの言い分:「" + apiMsg + "」" : "") + "。トークン絡みなら⚙️の🔑欄をサーバー側と突き合わせてみて。" };
     throw { jp: jpError(res.status, apiMsg) };
   }
 
@@ -5475,6 +5496,18 @@ function openProfile(){
   $("pushEnabled").checked = !!currentRoom.pushEnabled;
   $("todoEnabled").checked = !!currentRoom.todoEnabled;
   $("nemuriEnabled").checked = !!currentRoom.nemuriEnabled;
+  {
+    const lsel = $("localSlotSel");
+    lsel.innerHTML = "";
+    for(let li = 0; li < 2; li++){
+      const sl = (global.locals && global.locals[li]) || {};
+      const o = document.createElement("option");
+      o.value = String(li);
+      o.textContent = "つなぐ先: 🏠 " + ((sl.name || "").trim() || ((li + 1) + "軒目")) + ((sl.url || "").trim() ? "" : "（未設定）");
+      lsel.appendChild(o);
+    }
+    lsel.value = String(currentRoom.localSlot === 1 ? 1 : 0);
+  }
   $("modelSearch").value = "";
   $("modelList").classList.remove("show");
   pendingModel = currentRoom.model
@@ -5679,6 +5712,7 @@ $("saveProfileBtn").onclick = () => {
   currentRoom.pushEnabled = $("pushEnabled").checked;
   currentRoom.todoEnabled = $("todoEnabled").checked;
   currentRoom.nemuriEnabled = $("nemuriEnabled").checked;
+  currentRoom.localSlot = $("localSlotSel").value === "1" ? 1 : 0;
   currentRoom.theme = pendingTheme;
   currentRoom.customLamp = pendingCustom.lamp;
   currentRoom.customUser = pendingCustom.user;
@@ -5743,25 +5777,34 @@ function showSelectedModel(){
     el.classList.add("show");
   } else el.classList.remove("show");
 }
-function localApiUrl(){
-  return (global.localUrl || "http://localhost:1234/v1").trim().replace(/\/+$/, "");
+function localSlotOf(room){
+  const i = (room && room.localSlot === 1) ? 1 : 0;
+  const s = (global.locals && global.locals[i]) || {};
+  return {
+    idx: i,
+    name: (s.name || "").trim() || ((i + 1) + "軒目"),
+    url: ((s.url || "").trim() || "http://localhost:1234/v1").replace(/\/+$/, ""),
+    token: s.token || "lm-studio"
+  };
 }
 $("localModelsBtn").onclick = async () => {
   const list = $("modelList");
-  list.innerHTML = '<div class="model-item">🏠に聞いてる…</div>';
+  const li = $("localSlotSel").value === "1" ? 1 : 0;
+  const lslot = localSlotOf({ localSlot: li });
+  list.innerHTML = '<div class="model-item">🏠（' + esc(lslot.name) + '）に聞いてる…</div>';
   list.classList.add("show");
   try{
-    const res = await fetch(localApiUrl() + "/models", { headers: { "Authorization": "Bearer " + (global.localToken || "lm-studio") } });
+    const res = await fetch(lslot.url + "/models", { headers: { "Authorization": "Bearer " + lslot.token } });
     if(!res.ok){
       let serverMsg = "";
       try{ serverMsg = (await res.text()).slice(0, 200); }catch(e){}
-      list.innerHTML = '<div class="model-item">🏠には届いたけど、断られちゃった（' + res.status + '）。サーバーの言い分:<br><b>' + esc(serverMsg || "（無言）") + '</b><br>トークン絡みなら、⚙️の🔑欄を「表示」で見て、LM Studioのトークンと一字一句同じか確認してみて。</div>';
+      list.innerHTML = '<div class="model-item">🏠（' + esc(lslot.name) + '）には届いたけど、断られちゃった（' + res.status + '）。サーバーの言い分:<br><b>' + esc(serverMsg || "（無言）") + '</b><br>トークン絡みなら、⚙️の🔑欄を「表示」で見て、サーバー側のトークンと一字一句同じか確認してみて。</div>';
       return;
     }
     const j = await res.json();
     const models = (j.data || []).map(m => m.id);
     if(models.length === 0){
-      list.innerHTML = '<div class="model-item">ローカルサーバーには繋がったけど、モデルが見つからないよ。LM Studioでモデルをロードしてね。</div>';
+      list.innerHTML = '<div class="model-item">ローカルサーバー（' + esc(lslot.name) + '）には繋がったけど、モデルが見つからないよ。サーバー側でモデルをロードしてね。</div>';
       return;
     }
     list.innerHTML = "";
@@ -5778,7 +5821,7 @@ $("localModelsBtn").onclick = async () => {
       list.appendChild(item);
     }
   }catch(e){
-    list.innerHTML = '<div class="model-item">ローカルLLMに繋がらなかった…。LM Studioで ①ローカルサーバーがON ②CORSがON ③モデルがロード済み ④トークンが必要な設定なら🔑欄と一致 を確認してね。接続先: ' + esc(localApiUrl()) + '（⚙️で変更できるよ）</div>';
+    list.innerHTML = '<div class="model-item">ローカルLLM（' + esc(lslot.name) + '）に繋がらなかった…。サーバー側で ①サーバーがON ②CORSがON ③モデルがロード済み ④トークンが必要な設定なら🔑欄と一致 を確認してね。接続先: ' + esc(lslot.url) + '（⚙️で変更できるよ）</div>';
   }
 };
 $("webModelsBtn").onclick = async () => {
@@ -5901,15 +5944,19 @@ async function renderStorageMeter(){
 }
 $("globalSettingsBtn").onclick = () => {
   $("apiKey").value = global.apiKey;
-  $("localUrl").value = global.localUrl || "";
-  $("localToken").value = global.localToken || "";
+  for(let li = 0; li < 2; li++){
+    const sl = (global.locals && global.locals[li]) || {};
+    $("localName" + li).value = sl.name || "";
+    $("localUrl" + li).value = sl.url || "";
+    $("localToken" + li).value = sl.token || "";
+    $("toggleLocalToken" + li).onclick = () => {
+      const el = $("localToken" + li);
+      el.type = el.type === "password" ? "text" : "password";
+      $("toggleLocalToken" + li).textContent = el.type === "password" ? "表示" : "隠す";
+    };
+  }
   $("workerToken").value = global.workerToken || "";
   $("chatNavSel").value = global.chatNav || "buttons";
-  $("toggleLocalToken").onclick = () => {
-    const el = $("localToken");
-    el.type = el.type === "password" ? "text" : "password";
-    $("toggleLocalToken").textContent = el.type === "password" ? "表示" : "隠す";
-  };
   $("toggleWorkerToken").onclick = () => {
     const el = $("workerToken");
     el.type = el.type === "password" ? "text" : "password";
@@ -5956,8 +6003,11 @@ $("imgModelsBtn").onclick = async () => {
 };
 $("saveGlobalBtn").onclick = () => {
   global.apiKey = $("apiKey").value.trim();
-  global.localUrl = $("localUrl").value.trim();
-  global.localToken = $("localToken").value.replace(/\s+/g, "");
+  global.locals = [0, 1].map(li => ({
+    name: $("localName" + li).value.trim(),
+    url: $("localUrl" + li).value.trim(),
+    token: $("localToken" + li).value.replace(/\s+/g, "")
+  }));
   global.workerToken = $("workerToken").value.replace(/\s+/g, "");
   global.imgModel = $("imgModel").value.trim();
   global.chatNav = $("chatNavSel").value;
